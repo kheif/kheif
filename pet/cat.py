@@ -1,309 +1,382 @@
-"""Byte, drawn as a cartoon in a warm, candle lit room.
+"""Byte, painted as a close up portrait.
 
-Everything is plain SVG paths, gradients and CSS animation so it works
-inside a GitHub README (no scripts, no external files).
+Style notes (from the reference the profile owner picked):
+  * angular, planar construction: straight runs that break into short
+    curves, sharp corners at every joint, no bubbly shapes
+  * thin, dark brown, tapered brush lines instead of a uniform outline
+  * hard edged cel shadows cut along the planes, shadows drift to maroon
+  * small eyes, heavy upper lids, sideways glance: droll, a bit tired
+  * muted warm palette, near empty dark background, shallow depth of field
+
+Everything is plain SVG so it renders inside a GitHub README.
 """
+import math
 
-LINE = "#1c110b"      # outline
-FUR = "#e89a52"
-FUR_SHADE = "#b8612c"
-FUR_LIGHT = "#ffc07a"
-STRIPE = "#a8541f"
-CREAM = "#f6dcb4"
-CREAM_SHADE = "#d6ad80"
-PINK = "#e58a7d"
-IRIS = "#c9b23a"
-IRIS_DARK = "#7e7a1e"
-TEXT = "#f1e3c8"
-MUTED = "#a88f72"
+LINE = "#2a1610"
+FUR_LIT = "#e2a46a"
+FUR = "#c47d45"
+FUR_SHADE = "#a2593a"
+FUR_DEEP = "#6e342a"
+STRIPE = "#9a5532"
+CREAM_LIT = "#eed6b4"
+CREAM = "#cfb08e"
+CREAM_SHADE = "#9a7663"
+EAR_IN = "#8c5250"
+IRIS = "#b99a3c"
+TEXT = "#eadbc2"
+MUTED = "#9c8670"
 SERIF = "Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif"
 
 
+# ------------------------------------------------------------------ brush
+
+
+def _quad(p0, p1, p2, t):
+    a = (1 - t) ** 2
+    b = 2 * (1 - t) * t
+    c = t * t
+    return a * p0[0] + b * p1[0] + c * p2[0], a * p0[1] + b * p1[1] + c * p2[1]
+
+
+def brush(p0, p1, p2, w, color=LINE, opacity=1.0, start=0.0, end=0.0, n=14):
+    """A tapered stroke along a quadratic curve, thickest in the middle.
+
+    start/end thin one end more than the other, like a real brush mark.
+    """
+    left, right = [], []
+    for i in range(n + 1):
+        t = i / n
+        x, y = _quad(p0, p1, p2, t)
+        x2, y2 = _quad(p0, p1, p2, min(1, t + 0.01))
+        x1, y1 = _quad(p0, p1, p2, max(0, t - 0.01))
+        dx, dy = x2 - x1, y2 - y1
+        ln = math.hypot(dx, dy) or 1
+        nx, ny = -dy / ln, dx / ln
+        k = math.sin(math.pi * t) ** 0.7
+        k *= 1 - start * (1 - t) - end * t
+        h = w / 2 * max(k, 0.06)
+        left.append((x + nx * h, y + ny * h))
+        right.append((x - nx * h, y - ny * h))
+    pts = left + right[::-1]
+    d = "M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in pts) + "z"
+    op = f' opacity="{opacity}"' if opacity != 1 else ""
+    return f'<path d="{d}" fill="{color}"{op}/>'
+
+
+def shape(points, bends, fill="none", extra=""):
+    """Closed path whose edges bow outward by bends[i] * edge length.
+
+    0 keeps an edge straight (sharp joints), small values give the
+    "straight that breaks into a curve" feel of the reference.
+    """
+    d = [f"M{points[0][0]} {points[0][1]}"]
+    for i in range(len(points)):
+        a, b = points[i], points[(i + 1) % len(points)]
+        k = bends[i] if i < len(bends) else 0
+        mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        cx, cy = mx + dy * k, my - dx * k
+        d.append(f"Q{cx:.1f} {cy:.1f} {b[0]} {b[1]}")
+    return f'<path d="{" ".join(d)}z" fill="{fill}" {extra}/>'
+
+
+def poly(points, fill, extra=""):
+    d = "M" + " L".join(f"{x} {y}" for x, y in points) + "z"
+    return f'<path d="{d}" fill="{fill}" {extra}/>'
+
+
+# ------------------------------------------------------------------ defs
+
+
 def defs(uid=""):
-    """Gradients and filters shared by the scenes."""
     return f"""
-    <radialGradient id="glow{uid}" cx="0.3" cy="0.55" r="0.75">
-      <stop offset="0" stop-color="#7a4a26"/>
-      <stop offset="0.45" stop-color="#3d2416"/>
-      <stop offset="1" stop-color="#160d08"/>
+    <radialGradient id="bg{uid}" cx="0.32" cy="0.42" r="0.85">
+      <stop offset="0" stop-color="#5a3622"/>
+      <stop offset="0.38" stop-color="#3a2216"/>
+      <stop offset="1" stop-color="#140b07"/>
     </radialGradient>
-    <radialGradient id="candle{uid}" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#ffcf7a" stop-opacity=".55"/>
-      <stop offset="0.4" stop-color="#ff9a3c" stop-opacity=".18"/>
-      <stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/>
+    <radialGradient id="vignette{uid}" cx="0.45" cy="0.5" r="0.8">
+      <stop offset="0.5" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".65"/>
     </radialGradient>
-    <radialGradient id="vignette{uid}" cx="0.5" cy="0.5" r="0.75">
-      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
-      <stop offset="1" stop-color="#000" stop-opacity=".6"/>
+    <linearGradient id="key{uid}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd9a0" stop-opacity=".22"/>
+      <stop offset="0.5" stop-color="#ffd9a0" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="iris{uid}" cx="0.35" cy="0.7" r="0.8">
+      <stop offset="0" stop-color="#e6cf74"/>
+      <stop offset="0.65" stop-color="{IRIS}"/>
+      <stop offset="1" stop-color="#6e5a1e"/>
     </radialGradient>
-    <linearGradient id="fur{uid}" x1="0" y1="0" x2="1" y2="0.3">
-      <stop offset="0" stop-color="{FUR_LIGHT}"/>
-      <stop offset="0.45" stop-color="{FUR}"/>
-      <stop offset="1" stop-color="{FUR_SHADE}"/>
+    <linearGradient id="facepaint{uid}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe2b0" stop-opacity=".28"/>
+      <stop offset="0.45" stop-color="#ffe2b0" stop-opacity="0"/>
+      <stop offset="0.7" stop-color="#3a140c" stop-opacity="0"/>
+      <stop offset="1" stop-color="#3a140c" stop-opacity=".35"/>
     </linearGradient>
-    <linearGradient id="cream{uid}" x1="0" y1="0" x2="1" y2="0.2">
-      <stop offset="0" stop-color="#fff0d6"/>
-      <stop offset="0.5" stop-color="{CREAM}"/>
-      <stop offset="1" stop-color="{CREAM_SHADE}"/>
-    </linearGradient>
-    <radialGradient id="iris{uid}" cx="0.4" cy="0.65" r="0.7">
-      <stop offset="0" stop-color="#f0e07a"/>
-      <stop offset="0.6" stop-color="{IRIS}"/>
-      <stop offset="1" stop-color="{IRIS_DARK}"/>
-    </radialGradient>
-    <linearGradient id="wood{uid}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#5a3520"/>
-      <stop offset="0.15" stop-color="#3e2415"/>
-      <stop offset="1" stop-color="#1e110a"/>
-    </linearGradient>
-    <linearGradient id="cushion{uid}" x1="0" y1="0" x2="1" y2="0.4">
-      <stop offset="0" stop-color="#8a3b3b"/>
-      <stop offset="1" stop-color="#4a1c22"/>
-    </linearGradient>
-    <filter id="grain{uid}" x="0" y="0" width="100%" height="100%">
-      <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7" result="n"/>
-      <feColorMatrix type="matrix" values="0 0 0 0 0.5  0 0 0 0 0.35  0 0 0 0 0.2  0 0 0 .55 0"/>
+    <filter id="paint{uid}" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".012 .02" numOctaves="3" seed="4"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .55  0 0 0 0 .34  0 0 0 0 .2  0 0 0 .9 -.3"/>
+      <feGaussianBlur stdDeviation="6"/>
     </filter>
-    <filter id="soft{uid}"><feGaussianBlur stdDeviation="1.4"/></filter>
-    <filter id="blur{uid}"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="grain{uid}" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="9"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .5  0 0 0 0 .38  0 0 0 0 .26  0 0 0 .5 0"/>
+    </filter>
+    <filter id="dof{uid}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="dof2{uid}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.2"/></filter>
+    <filter id="glow{uid}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
     """
 
 
 CSS = """
-    .ln { stroke: #1c110b; stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
-    .thin { stroke: #1c110b; stroke-width: 2.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-    @keyframes breathe { 0%,100% { transform: scale(1,1) } 50% { transform: scale(1.015,.985) } }
-    .breathe { transform-box: fill-box; transform-origin: 50% 100%; animation: breathe var(--breath, 3.6s) ease-in-out infinite; }
-    @keyframes swish { 0%,100% { transform: rotate(-6deg) } 50% { transform: rotate(9deg) } }
-    .tail { transform-box: fill-box; transform-origin: 0% 100%; animation: swish var(--tail, 2.8s) ease-in-out infinite; }
-    @keyframes twitch { 0%,88%,100% { transform: rotate(0) } 91% { transform: rotate(-9deg) } 95% { transform: rotate(3deg) } }
-    .ear { transform-box: fill-box; transform-origin: 70% 100%; animation: twitch 6.5s ease-in-out infinite; }
-    @keyframes flicker { 0%,100% { opacity: .95; transform: scale(1) } 20% { opacity: .8; transform: scale(.97,1.03) } 45% { opacity: 1; transform: scale(1.02,.98) } 70% { opacity: .85; transform: scale(.98,1.02) } }
-    .flame { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker 1.7s ease-in-out infinite; }
-    .light { animation: flicker 2.3s ease-in-out infinite; }
-    @keyframes drift { 0% { transform: translate(0,0); opacity: 0 } 15% { opacity: .9 } 85% { opacity: .7 } 100% { transform: translate(var(--dx), -90px); opacity: 0 } }
-    .mote { animation: drift var(--d, 11s) linear infinite; }
-    @keyframes rise { 0% { transform: translateY(8px) scale(.6); opacity: 0 } 20% { opacity: 1 } 100% { transform: translateY(-50px) scale(1.05); opacity: 0 } }
-    .rise { transform-box: fill-box; transform-origin: center; animation: rise 3.4s ease-out infinite; opacity: 0; }
-    @keyframes steam { 0% { transform: translateY(6px) scaleX(1); opacity: 0 } 35% { opacity: .55 } 100% { transform: translateY(-30px) scaleX(1.5); opacity: 0 } }
-    .steam { transform-box: fill-box; transform-origin: 50% 100%; animation: steam 3.2s ease-out infinite; opacity: 0; }
+    @keyframes breathe { 0%,100% { transform: translateY(0) } 50% { transform: translateY(1.6px) } }
+    .breathe { animation: breathe 4.2s ease-in-out infinite; }
+    @keyframes nod { 0%,100% { transform: rotate(0) } 50% { transform: rotate(1.2deg) } }
+    .head { transform-box: fill-box; transform-origin: 50% 90%; animation: nod 6s ease-in-out infinite; }
+    @keyframes twitch { 0%,90%,100% { transform: rotate(0) } 92% { transform: rotate(-7deg) } 95% { transform: rotate(2deg) } }
+    .ear { transform-box: fill-box; transform-origin: 60% 100%; animation: twitch 7s ease-in-out infinite; }
+    @keyframes glance { 0%,40%,100% { transform: translateX(0) } 48%,70% { transform: translateX(-4px) } }
+    .pupil { animation: glance 9s ease-in-out infinite; }
+    @keyframes waver { 0%,100% { opacity: .9 } 30% { opacity: .75 } 60% { opacity: 1 } }
+    .keylight { animation: waver 3.1s ease-in-out infinite; }
+    @keyframes fade { 0% { opacity: 0; transform: translateY(6px) } 25% { opacity: .9 } 100% { opacity: 0; transform: translateY(-34px) } }
+    .rise { animation: fade 4s ease-out infinite; opacity: 0; }
+    @keyframes steam { 0% { transform: translateY(6px) scaleX(1); opacity: 0 } 35% { opacity: .45 } 100% { transform: translateY(-30px) scaleX(1.5); opacity: 0 } }
+    .steam { transform-box: fill-box; transform-origin: 50% 100%; animation: steam 3.4s ease-out infinite; opacity: 0; }
 """
 
 
-def blink_css(lid, eye_h=36, period=5.0):
-    """Upper lid sits at `lid` px down, closes fully for a moment."""
+def blink_css(lid, closed=38, period=5.5):
     return (
-        f"@keyframes blink {{ 0%,90%,100% {{ transform: translateY({lid}px) }} "
-        f"93%,95% {{ transform: translateY({eye_h}px) }} }}\n"
-        f"    .lid {{ transform: translateY({lid}px); animation: blink {period}s ease-in-out infinite; }}\n"
-        f"    .lid2 {{ animation-delay: .04s }}"
+        f"@keyframes blink {{ 0%,91%,100% {{ transform: translateY({lid}px) }} "
+        f"93.5%,95% {{ transform: translateY({closed}px) }} }}\n"
+        f"    .lid {{ transform: translateY({lid}px); animation: blink {period}s ease-in-out infinite; }}"
     )
 
 
-# ----------------------------------------------------------------- the cat
+# ------------------------------------------------------------------ head
+
+# Head in local coordinates, 3/4 view turned towards the viewer's left.
+# The near side (left) is lit, the far side (right) falls into shadow.
+HEAD = [
+    (-96, -38), (-112, -148), (-36, -84),       # near ear
+    (-4, -92), (26, -92),                       # flat crown
+    (80, -146), (98, -46),                      # far ear
+    (110, -8), (128, 22), (104, 34), (116, 56), (84, 60),   # far cheek tufts
+    (44, 88), (-12, 100),                       # jaw to chin
+    (-58, 84), (-104, 70), (-130, 52), (-104, 38), (-138, 14), (-104, 2),  # near cheek tufts
+]
+
+HEAD_BENDS = [
+    0.04, 0.02, 0.1, 0.06, 0.03, 0.02, 0.1,
+    0.06, 0, 0, 0, 0.04, 0.08, 0.08,
+    0.06, 0, 0, 0, 0, 0.04,
+]
+
+NEAR_EAR_IN = [(-92, -50), (-104, -128), (-48, -84)]
+FAR_EAR_IN = [(36, -92), (76, -132), (88, -56)]
+
+# shadow plane: the far side of the face, cut along the nose bridge
+SHADOW = [
+    (40, -96), (80, -146), (98, -46), (110, -8), (128, 22), (104, 34), (116, 56),
+    (84, 60), (44, 88), (24, 94), (40, 66), (50, 40), (34, 16), (30, -20), (44, -60),
+]
+# a deeper core shadow just past the terminator
+CORE = [(44, -60), (30, -20), (34, 16), (50, 40), (40, 66), (24, 94), (36, 92), (56, 62), (52, 18), (44, -16), (54, -64)]
+
+MUZZLE = [(-70, 40), (-36, 20), (-6, 18), (28, 30), (46, 52), (32, 80), (-12, 96), (-50, 84)]
+MUZZLE_SHADE = [(10, 22), (28, 30), (46, 52), (32, 80), (-4, 94), (14, 70), (20, 46)]
+CHIN_SHADE = [(-50, 84), (-12, 96), (32, 80), (20, 92), (-12, 102), (-46, 92)]
+
+NOSE = [(-40, 16), (-6, 14), (-20, 34)]
 
 
-def eye(cx, cy, mood, uid, side):
-    """One eye. side is -1 for left, 1 for right (mirrors the shine)."""
-    rx, ry = 15, 18
-    if mood == "happy":
-        return f'<path class="thin" d="M{cx - 13} {cy + 4} Q{cx} {cy - 12} {cx + 13} {cy + 4}" stroke-width="4"/>'
-    if mood == "asleep":
+def eye(cx, cy, w, h, mood, uid, name, look):
+    """An almond eye with a heavy upper lid. look shifts the pupil."""
+    if mood in ("happy", "asleep"):
+        bend = -7 if mood == "happy" else 7
         return (
-            f'<path class="thin" d="M{cx - 13} {cy} Q{cx} {cy + 10} {cx + 13} {cy}" stroke-width="4"/>'
-            f'<path class="thin" d="M{cx + 9 * side} {cy + 5} l{5 * side} 5" stroke-width="2.4"/>'
+            brush((cx - w, cy + 2), (cx, cy + bend), (cx + w, cy - 1), 4.6)
+            + brush((cx - w + 4, cy + 7), (cx, cy + 9 + bend / 2), (cx + w - 4, cy + 6), 1.6, LINE, 0.6)
         )
-    pupil_rx, pupil_ry = (9, 13) if mood == "hungry" else (5.5, 12)
-    clip = f"eye{uid}{side}"
-    lid_group = (
-        f'<g class="lid{" lid2" if side > 0 else ""}">'
-        f'<rect x="{cx - rx - 2}" y="{cy - ry - 40}" width="{2 * rx + 4}" height="40" fill="url(#fur{uid})"/>'
-        f'<path d="M{cx - rx - 2} {cy - ry} Q{cx} {cy - ry + 5} {cx + rx + 2} {cy - ry}" stroke="{LINE}" stroke-width="4" fill="none"/>'
-        f"</g>"
-    )
+    top = f"Q{cx - w * 0.2} {cy - h * 1.3} {cx + w} {cy - h * 0.25}"
+    bottom = f"Q{cx + w * 0.1} {cy + h * 1.15} {cx - w} {cy + h * 0.1}"
+    almond = f"M{cx - w} {cy + h * 0.1} {top} {bottom}z"
+    pr = 7.5 if mood == "hungry" else 5.5
+    px = cx + look
     return f"""
-      <clipPath id="{clip}"><ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}"/></clipPath>
-      <ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="url(#iris{uid})"/>
-      <g clip-path="url(#{clip})">
-        <ellipse cx="{cx + 1.5 * side}" cy="{cy + 1}" rx="{pupil_rx}" ry="{pupil_ry}" fill="{LINE}"/>
-        <circle cx="{cx - 5}" cy="{cy - 6}" r="{4.5 if mood == 'hungry' else 3.6}" fill="#fff8ea"/>
-        <circle cx="{cx + 5}" cy="{cy + 7}" r="1.8" fill="#fff8ea" opacity=".8"/>
-        {lid_group}
+      <clipPath id="{name}{uid}"><path d="{almond}"/></clipPath>
+      <path d="{almond}" fill="url(#iris{uid})"/>
+      <g clip-path="url(#{name}{uid})">
+        <g class="pupil">
+          <ellipse cx="{px}" cy="{cy + 1}" rx="{pr * 0.62}" ry="{pr * 1.55}" fill="{LINE}"/>
+          <circle cx="{px - 4}" cy="{cy - 4}" r="2.6" fill="#fff6e4" opacity=".9"/>
+        </g>
+        <path d="M{cx - w} {cy - h * 0.6} H{cx + w}" stroke="#000" stroke-opacity=".35" stroke-width="{h * 0.9}"/>
+        <g class="lid">
+          <rect x="{cx - w - 4}" y="{cy - h - 34}" width="{2 * w + 8}" height="34" fill="{FUR}"/>
+          <path d="M{cx - w - 4} {cy - h} Q{cx} {cy - h + 7} {cx + w + 4} {cy - h - 2}" stroke="{LINE}" stroke-width="5" fill="none"/>
+        </g>
       </g>
-      <ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="none" stroke="{LINE}" stroke-width="3.6"/>
+      <path d="{almond}" fill="none" stroke="{LINE}" stroke-width="1.6"/>
+      {brush((cx - w * 0.6, cy + h * 0.95), (cx + w * 0.1, cy + h * 1.25), (cx + w * 0.8, cy + h * 0.6), 1.8, LINE, .55)}
+      {brush((cx - w - 3, cy + h * 0.05), (cx - w * 0.1, cy - h * 1.35), (cx + w + 3, cy - h * 0.3), 4.2)}
     """
 
 
-def mouth(mood):
-    if mood == "hungry":
-        return (
-            '<path d="M-9 -126 Q0 -132 9 -126 Q8 -110 0 -108 Q-8 -110 -9 -126z" fill="#6e2a2a" class="ln" stroke-width="3"/>'
-            '<path d="M-5 -114 Q0 -118 5 -114 Q3 -110 0 -110 Q-3 -110 -5 -114z" fill="#d06a6a"/>'
-        )
-    if mood == "bored":
-        return '<path class="thin" d="M-9 -125 Q0 -123 9 -126"/>'
-    if mood == "asleep":
-        return '<path class="thin" d="M-6 -126 Q0 -123 6 -126"/>'
-    return '<path class="thin" d="M-13 -128 Q-7 -121 0 -127 Q7 -121 13 -128"/>'
-
-
-def cat(mood, uid="", x=0, y=0, scale=1.0, tail=True):
-    """Byte sitting, origin at the middle of the bottom of the body."""
-    lid = {"fine": 11, "bored": 17, "hungry": 2}.get(mood, 11)
-    head_tilt = {"asleep": 7, "happy": -5, "bored": 3, "hungry": -3}.get(mood, -2)
-    breath = "5.5s" if mood == "asleep" else "3.6s"
-    tail_speed = {"happy": "1.2s", "asleep": "6s", "bored": "4.5s", "hungry": "1.8s"}.get(mood, "2.8s")
-
-    tail_svg = ""
-    if tail:
-        tail_d = "M48 -14 C98 -6 128 -40 116 -86 C110 -110 120 -128 136 -122"
-        tail_svg = f"""
-    <g class="tail" style="--tail:{tail_speed}">
-      <path d="{tail_d}" stroke="{LINE}" stroke-width="30" fill="none" stroke-linecap="round"/>
-      <path d="{tail_d}" stroke="url(#fur{uid})" stroke-width="22" fill="none" stroke-linecap="round"/>
-      <path d="M112 -58 q10 2 14 -4 M114 -86 q9 4 14 -2 M120 -112 q8 4 12 -1" stroke="{STRIPE}" stroke-width="4" fill="none" stroke-linecap="round"/>
-    </g>"""
-
-    return f"""
-  <g transform="translate({x} {y}) scale({scale})">
-    {tail_svg}
-    <g class="breathe" style="--breath:{breath}">
-      <!-- body -->
-      <clipPath id="bodyclip{uid}"><path d="M-74 -4 C-86 -52 -70 -104 -40 -122 L40 -122 C70 -104 86 -52 74 -4 Q0 6 -74 -4z"/></clipPath>
-      <path fill="url(#fur{uid})" d="M-74 -4 C-86 -52 -70 -104 -40 -122 L40 -122 C70 -104 86 -52 74 -4 Q0 6 -74 -4z"/>
-      <g clip-path="url(#bodyclip{uid})">
-        <path fill="url(#cream{uid})" d="M-28 -116 C-44 -76 -38 -34 -22 -4 L22 -4 C38 -34 44 -76 28 -116z"/>
-        <path d="M18 -130 C46 -96 40 -40 14 10 L100 10 L100 -130z" fill="#5a2410" opacity=".45"/>
-        <path d="M-70 -100 C-84 -60 -80 -30 -72 0" stroke="#ffe0a8" stroke-width="7" fill="none" opacity=".55" filter="url(#soft{uid})"/>
-      </g>
-      <path class="ln" fill="none" d="M-74 -4 C-86 -52 -70 -104 -40 -122 L40 -122 C70 -104 86 -52 74 -4 Q0 6 -74 -4z"/>
-      <path d="M-74 -40 q10 -4 16 2 M-78 -62 q10 -4 16 2 M76 -40 q-10 -4 -16 2 M78 -62 q-10 -4 -16 2" stroke="{STRIPE}" stroke-width="5" fill="none" stroke-linecap="round"/>
-      <!-- front legs and paws -->
-      <path class="thin" d="M-10 -66 C-12 -40 -10 -22 -8 -10 M10 -66 C12 -40 10 -22 8 -10"/>
-      <ellipse class="ln" cx="-26" cy="-6" rx="22" ry="11" fill="url(#cream{uid})" stroke-width="3.4"/>
-      <ellipse class="ln" cx="26" cy="-6" rx="22" ry="11" fill="url(#cream{uid})" stroke-width="3.4"/>
-      <path class="thin" d="M-32 -10 v5 M-21 -10 v5 M21 -10 v5 M32 -10 v5" stroke-width="2"/>
-
-      <!-- head -->
-      <g transform="rotate({head_tilt} 0 -150)">
-        <g class="ear">
-          <path class="ln" fill="url(#fur{uid})" d="M-66 -180 L-74 -252 Q-72 -258 -66 -254 L-16 -214z"/>
-          <path fill="{PINK}" d="M-60 -192 L-66 -238 L-30 -212z" opacity=".85"/>
-          <path d="M-58 -200 l-6 -14 M-52 -204 l-4 -10" stroke="{CREAM}" stroke-width="2" stroke-linecap="round"/>
-        </g>
-        <path class="ln" fill="url(#fur{uid})" d="M66 -180 L74 -252 Q72 -258 66 -254 L16 -214z"/>
-        <path fill="{PINK}" d="M60 -192 L66 -238 L30 -212z" opacity=".55"/>
-
-        <clipPath id="headclip{uid}"><path d="M-72 -152 C-76 -196 -48 -226 0 -228 C48 -226 76 -196 72 -152 L84 -144 L70 -138 L78 -126 L60 -124 C46 -110 24 -104 0 -104 C-24 -104 -46 -110 -60 -124 L-78 -126 L-70 -138 L-84 -144z"/></clipPath>
-        <path fill="url(#fur{uid})" d="M-72 -152 C-76 -196 -48 -226 0 -228 C48 -226 76 -196 72 -152 L84 -144 L70 -138 L78 -126 L60 -124 C46 -110 24 -104 0 -104 C-24 -104 -46 -110 -60 -124 L-78 -126 L-70 -138 L-84 -144z"/>
-        <g clip-path="url(#headclip{uid})">
-          <path d="M30 -240 C58 -200 52 -140 20 -98 L100 -98 L100 -240z" fill="#5a2410" opacity=".4"/>
-          <path d="M-66 -196 C-78 -170 -78 -150 -72 -134" stroke="#ffe0a8" stroke-width="6" fill="none" opacity=".6" filter="url(#soft{uid})"/>
-        </g>
-        <path class="ln" fill="none" d="M-72 -152 C-76 -196 -48 -226 0 -228 C48 -226 76 -196 72 -152 L84 -144 L70 -138 L78 -126 L60 -124 C46 -110 24 -104 0 -104 C-24 -104 -46 -110 -60 -124 L-78 -126 L-70 -138 L-84 -144z"/>
-        <path d="M-12 -226 q2 14 -2 24 M0 -228 q2 16 -1 30 M12 -226 q2 14 -2 24" stroke="{STRIPE}" stroke-width="5" fill="none" stroke-linecap="round"/>
-        <path d="M-72 -168 q12 2 18 10 M72 -168 q-12 2 -18 10" stroke="{STRIPE}" stroke-width="4" fill="none" stroke-linecap="round"/>
-
-        <!-- muzzle -->
-        <ellipse cx="-12" cy="-128" rx="16" ry="12" fill="url(#cream{uid})"/>
-        <ellipse cx="12" cy="-128" rx="16" ry="12" fill="url(#cream{uid})"/>
-        <ellipse cx="-40" cy="-136" rx="10" ry="6" fill="{PINK}" opacity=".35"/>
-        <ellipse cx="40" cy="-136" rx="10" ry="6" fill="{PINK}" opacity=".35"/>
-
-        <style>{blink_css(lid)}</style>
-        {eye(-28, -160, mood, uid, -1)}
-        {eye(28, -160, mood, uid, 1)}
-
-        <path d="M-7 -140 Q0 -144 7 -140 Q4 -133 0 -132 Q-4 -133 -7 -140z" fill="{PINK}" class="ln" stroke-width="2.6"/>
-        {mouth(mood)}
-        <g stroke="#f6e6cc" stroke-width="1.6" stroke-linecap="round" opacity=".75">
-          <path d="M-26 -130 Q-56 -136 -86 -132 M-26 -125 Q-56 -124 -84 -116"/>
-          <path d="M26 -130 Q56 -136 86 -132 M26 -125 Q56 -124 84 -116"/>
-        </g>
-      </g>
-    </g>
-  </g>"""
-
-
-# ------------------------------------------------------------- the room
-
-
-def candle(x, y, uid=""):
-    return f"""
-  <g class="light"><circle cx="{x}" cy="{y - 70}" r="190" fill="url(#candle{uid})"/></g>
-  <g transform="translate({x} {y})">
-    <ellipse cx="0" cy="0" rx="30" ry="7" fill="#2a1a10"/>
-    <path class="ln" d="M-26 -4 Q0 6 26 -4 L24 -10 Q0 -2 -24 -10z" fill="#6b4a2c" stroke-width="3"/>
-    <path class="ln" d="M-13 -8 L-13 -60 Q0 -64 13 -60 L13 -8 Q0 -4 -13 -8z" fill="#efe0c0" stroke-width="3"/>
-    <path d="M-13 -60 Q0 -64 13 -60 Q11 -52 13 -44 Q8 -50 4 -42 Q2 -52 -3 -48 Q-8 -54 -13 -50z" fill="#fff6e0"/>
-    <path d="M5 -50 v28" stroke="#d8c39a" stroke-width="5" stroke-linecap="round" opacity=".6"/>
-    <path d="M0 -62 v-6" stroke="{LINE}" stroke-width="2"/>
-    <g class="flame">
-      <path d="M0 -94 C8 -82 8 -70 0 -66 C-8 -70 -8 -82 0 -94z" fill="#ffb347"/>
-      <path d="M0 -84 C4 -78 4 -71 0 -69 C-4 -71 -4 -78 0 -84z" fill="#fff3c4"/>
-    </g>
-  </g>"""
-
-
-def books(x, y):
-    """A small stack of old books, origin at bottom centre."""
-    spec = [(-58, 58, 22, "#6b2f2a", "#4a1f1c"), (-50, 52, 18, "#3f4a35", "#2b3324"), (-54, 60, 20, "#7a5a32", "#55401f")]
-    out, cy = [], y
-    for x0, w, h, c, dark in spec:
-        cy -= h
-        out.append(
-            f'<rect class="ln" x="{x + x0}" y="{cy}" width="{w * 2}" height="{h}" rx="4" fill="{c}" stroke-width="3"/>'
-            f'<rect x="{x + x0 + 4}" y="{cy + 5}" width="{w * 2 - 22}" height="{h - 10}" rx="2" fill="#d9c49a" opacity=".55"/>'
-            f'<path d="M{x + x0 + 4} {cy + 3} h{w * 2 - 20}" stroke="#ffe0a8" stroke-width="2" opacity=".35"/>'
-            f'<rect x="{x + x0 + w * 2 - 12}" y="{cy}" width="12" height="{h}" rx="3" fill="{dark}"/>'
-        )
-    return "".join(out), cy
-
-
-def frame(x, y, w, h, uid=""):
-    """A dim painting on the back wall, a little crooked."""
-    return f"""
-  <g transform="rotate(-2 {x + w / 2} {y + h / 2})" opacity=".55">
-    <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="3" fill="#4a2c18" stroke="#1c110b" stroke-width="3"/>
-    <rect x="{x + 9}" y="{y + 9}" width="{w - 18}" height="{h - 18}" fill="#2a2a24"/>
-    <circle cx="{x + w * 0.62}" cy="{y + h * 0.38}" r="{h * 0.13}" fill="#c9b886" opacity=".7"/>
-    <path d="M{x + 9} {y + h - 22} Q{x + w * 0.35} {y + h * 0.5} {x + w * 0.6} {y + h - 26} T{x + w - 9} {y + h - 30} V{y + h - 9} H{x + 9}z" fill="#3b4632"/>
-  </g>"""
-
-
-def motes(n, w, h, seed=3):
-    """Dust floating in the candle light. Deterministic pseudo random."""
+def head(mood, uid):
+    lid = {"fine": 15, "bored": 20, "hungry": 2}.get(mood, 15)
+    look = {"fine": 5, "bored": 7, "hungry": 0}.get(mood, 4)
     out = []
-    s = seed
-    for i in range(n):
-        s = (s * 1103515245 + 12345) % 2**31
-        x = 30 + s % (w - 60)
-        s = (s * 1103515245 + 12345) % 2**31
-        y = 60 + s % (h - 80)
-        s = (s * 1103515245 + 12345) % 2**31
-        r = 0.8 + (s % 100) / 70
-        d = 9 + (s % 9)
-        dx = (s % 41) - 20
-        delay = -(s % 13)
-        out.append(
-            f'<circle class="mote" cx="{x}" cy="{y}" r="{r:.1f}" fill="#ffd9a0" '
-            f'style="--d:{d}s;--dx:{dx}px;animation-delay:{delay}s"/>'
-        )
+
+    # ears behind the head shape
+    out.append(f'<g class="ear">{shape(HEAD[0:3] + [(-60, -60)], [0.04, 0.02, 0], FUR, f'stroke="{LINE}" stroke-width="2.6" stroke-linejoin="round"')}{shape(NEAR_EAR_IN, [0.03, 0.04, 0], EAR_IN)}'
+               f'{brush((-96, -60), (-100, -96), (-104, -122), 3, CREAM_LIT, .7)}'
+               f'{brush((-86, -60), (-86, -88), (-90, -110), 2.4, CREAM_LIT, .55)}</g>')
+    out.append(shape(HEAD[4:7] + [(60, -70)], [0.03, 0.02, 0], FUR_SHADE, f'stroke="{LINE}" stroke-width="2.6" stroke-linejoin="round"') + shape(FAR_EAR_IN, [0.03, 0.04, 0], FUR_DEEP))
+
+    # face planes
+    out.append(shape(HEAD, HEAD_BENDS, FUR))
+    out.append(f'<clipPath id="hc{uid}">{shape(HEAD, HEAD_BENDS, "#000")}</clipPath>')
+    out.append(f'<g clip-path="url(#hc{uid})">')
+    out.append(shape([(-108, -84), (14, -98), (16, -44), (-34, -40), (-118, -6)], [0.04, 0.12, 0.1, 0.12, 0.04], FUR_LIT, 'opacity=".8"'))
+    out.append(shape(SHADOW, [0, 0, 0, 0, 0, 0, 0, 0, 0, -0.1, -0.06, 0.08, -0.06, -0.06, -0.06], FUR_SHADE))
+    out.append(shape(CORE, [-0.06] * 11, FUR_DEEP, 'opacity=".5"'))
+    out.append(shape([(-92, -28), (-34, -40), (-24, -30), (-90, -20)], [0.12, 0, -0.1, 0], FUR_SHADE, 'opacity=".55"'))
+    out.append(shape([(14, -36), (58, -42), (66, -30), (16, -26)], [0.12, 0, -0.1, 0], FUR_DEEP, 'opacity=".45"'))
+    out.append(shape(MUZZLE, [0.1, 0.06, 0.08, 0.1, 0.08, 0.06, 0.06, 0.1], CREAM))
+    out.append(shape([(-66, 42), (-36, 22), (-8, 20), (-24, 40), (-56, 58)], [0.1, 0.05, -0.1, -0.1, 0.1], CREAM_LIT, 'opacity=".9"'))
+    out.append(shape(MUZZLE_SHADE, [0.06, 0.08, 0.1, 0.06, -0.06, -0.08, -0.08], CREAM_SHADE))
+    out.append(poly(CHIN_SHADE, FUR_DEEP, 'opacity=".45"'))
+    out.append(f'<rect x="-150" y="-160" width="300" height="270" fill="url(#facepaint{uid})"/>')
+    # loose fur strokes, lighter on the lit side
+    for (a, b, c, w, col, op) in [
+        ((-120, 30), (-100, 20), (-80, 26), 3, CREAM_LIT, .5),
+        ((-126, 54), (-104, 46), (-84, 54), 3, CREAM_LIT, .45),
+        ((-60, -70), (-40, -78), (-20, -76), 3, CREAM_LIT, .35),
+        ((100, 40), (86, 36), (70, 44), 3, FUR_DEEP, .6),
+        ((96, -20), (84, -10), (76, 4), 3, FUR_DEEP, .5),
+    ]:
+        out.append(brush(a, b, c, w, col, op))
+    for x0, x1, w in [(-30, -26, 6), (-12, -10, 7), (6, 4, 5)]:
+        out.append(brush((x0, -94), (x0 + 2, -74), (x1, -52), w, STRIPE, 0.9, start=-0.2, end=0.6))
+    for y in (-6, 14):
+        out.append(brush((-138, y + 4), (-120, y), (-96, y + 6), 5, STRIPE, 0.75))
+        out.append(brush((126, y + 10), (110, y + 6), (92, y + 12), 5, FUR_DEEP, 0.6))
+    out.append("</g>")
+
+    # silhouette: a thin even line, with heavier brush accents in the shadow
+    out.append(shape(HEAD, HEAD_BENDS, "none", f'stroke="{LINE}" stroke-width="2.6" stroke-linejoin="round"'))
+    for a, b, c, w in [
+        ((98, -46), (108, -24), (110, -8), 5), ((84, 60), (66, 76), (44, 88), 5),
+        ((44, 88), (16, 98), (-12, 100), 4.4), ((80, -146), (92, -100), (98, -46), 4),
+    ]:
+        out.append(brush(a, b, c, w))
+
+    out.append(f"<style>{blink_css(lid)}</style>")
+    out.append(eye(-60, -8, 27, 18, mood, uid, "eyeN", look))
+    out.append(eye(38, -10, 20, 16, mood, uid, "eyeF", look - 1))
+
+    # nose bridge and nose
+    out.append(brush((-6, -28), (-14, -4), (-24, 14), 2.4, LINE, 0.8))
+    out.append(poly(NOSE, "#8e4a48"))
+    out.append(poly([(-40, 16), (-24, 15), (-26, 22)], "#c07a6c"))
+    out.append(brush((-42, 16), (-22, 12), (-4, 14), 2.6))
+    out.append(brush((-21, 34), (-20, 42), (-22, 48), 2.2))
+
+    if mood == "hungry":
+        out.append(poly([(-40, 54), (-22, 48), (-2, 54), (-10, 72), (-30, 72)], "#4a1d1c"))
+        out.append(poly([(-30, 70), (-14, 70), (-20, 64)], "#a5504c"))
+        out.append(poly([(-34, 54), (-31, 61), (-28, 54)], "#efe2c8"))
+        out.append(poly([(-12, 54), (-9, 61), (-6, 54)], "#efe2c8"))
+        out.append(brush((-42, 54), (-22, 46), (0, 54), 2.6))
+    elif mood == "happy":
+        out.append(brush((-48, 50), (-36, 58), (-22, 48), 2.6))
+        out.append(brush((-22, 48), (-8, 58), (6, 48), 2.6))
+    elif mood == "bored":
+        out.append(brush((-46, 54), (-24, 52), (2, 54), 2.6))
+    else:
+        out.append(brush((-46, 52), (-34, 57), (-22, 48), 2.6))
+        out.append(brush((-22, 48), (-10, 55), (2, 51), 2.4))
+
+    for (x0, y0), (x1, y1), (x2, y2) in [
+        ((-70, 44), (-130, 34), (-176, 40)),
+        ((-68, 52), (-128, 54), (-170, 68)),
+        ((18, 42), (70, 32), (120, 36)),
+        ((18, 50), (66, 52), (112, 64)),
+    ]:
+        out.append(brush((x0, y0), (x1, y1), (x2, y2), 1.8, "#efe2c8", 0.7))
     return "".join(out)
 
 
-def backdrop(w, h, uid="", table_y=None):
-    table = ""
-    if table_y is not None:
-        table = (
-            f'<rect x="0" y="{table_y}" width="{w}" height="{h - table_y}" fill="url(#wood{uid})"/>'
-            f'<path d="M0 {table_y} H{w}" stroke="#7a4a2a" stroke-width="2" opacity=".7"/>'
-        )
-    return f'<rect width="{w}" height="{h}" fill="url(#glow{uid})"/>{table}'
+def body(uid):
+    """Shoulders and chest ruff, out of focus like the reference's foreground."""
+    return f"""
+      <g filter="url(#dof2{uid})">
+        <path d="M-210 230 C-200 140 -150 78 -70 70 L70 66 C140 66 196 130 206 230z" fill="{FUR}"/>
+        <path d="M60 66 C140 66 196 130 206 230 L80 230 C96 160 90 100 60 66z" fill="{FUR_SHADE}"/>
+        <path d="M-200 200 C-188 140 -150 90 -110 76 C-140 110 -160 160 -166 220z" fill="{FUR_LIT}" opacity=".55"/>
+        <path d="M-84 70 C-80 100 -96 116 -70 128 C-86 146 -64 160 -44 156 C-48 178 -20 186 -6 172 C4 196 34 184 34 164 C58 172 72 150 58 134 C84 124 80 96 64 70z" fill="{CREAM}"/>
+        <path d="M30 72 C40 100 50 120 58 134 C72 150 58 172 34 164 C40 140 34 100 24 74z" fill="{CREAM_SHADE}"/>
+        <path d="M-210 230 C-200 140 -150 78 -70 70 M70 66 C140 66 196 130 206 230" stroke="{LINE}" stroke-width="3" fill="none"/>
+      </g>"""
+
+
+def cat(mood, uid="", x=0, y=0, scale=1.0, with_body=True):
+    tilt = {"asleep": 9, "happy": -6, "bored": 4, "hungry": -2}.get(mood, 0)
+    drop = 14 if mood == "asleep" else 0
+    parts = []
+    if with_body:
+        parts.append(body(uid))
+    parts.append(
+        f'<g transform="translate(0 {drop}) rotate({tilt} 0 60)"><g class="head">{head(mood, uid)}</g></g>'
+    )
+    return f'<g transform="translate({x} {y}) scale({scale})"><g class="breathe">{"".join(parts)}</g></g>'
+
+
+# ------------------------------------------------------------------ room
+
+
+def backdrop(w, h, uid=""):
+    return (
+        f'<rect width="{w}" height="{h}" fill="url(#bg{uid})"/>'
+        f'<rect width="{w}" height="{h}" filter="url(#paint{uid})" opacity=".3"/>'
+        f'<ellipse cx="{w * 0.3}" cy="{h * 0.45}" rx="{w * 0.22}" ry="{h * 0.4}" fill="#6b4128" opacity=".45" filter="url(#glow{uid})"/>'
+    )
 
 
 def overlay(w, h, uid=""):
     return (
-        f'<rect width="{w}" height="{h}" filter="url(#grain{uid})" opacity=".22"/>'
+        f'<rect class="keylight" width="{w}" height="{h}" fill="url(#key{uid})"/>'
+        f'<rect width="{w}" height="{h}" filter="url(#grain{uid})" opacity=".14"/>'
         f'<rect width="{w}" height="{h}" fill="url(#vignette{uid})"/>'
     )
+
+
+def fish_bones(x, y, uid=""):
+    """Memento mori for a hungry cat. Sits in the blurred foreground."""
+    ribs = "".join(
+        brush((x + dx, y - 2), (x + dx + 6, y - 14), (x + dx + 2, y - 24), 3.2, "#d9c9a8")
+        + brush((x + dx, y + 2), (x + dx + 6, y + 14), (x + dx + 2, y + 24), 3.2, "#d9c9a8")
+        for dx in range(-30, 34, 12)
+    )
+    return f"""
+    <g filter="url(#dof{uid})" opacity=".9">
+      <ellipse cx="{x}" cy="{y + 30}" rx="110" ry="22" fill="#6e6a64"/>
+      <ellipse cx="{x}" cy="{y + 24}" rx="96" ry="16" fill="#8f8a82"/>
+      {brush((x - 60, y), (x, y - 3), (x + 50, y), 5, "#e6d8ba")}
+      {ribs}
+      {poly([(x - 60, y), (x - 90, y - 22), (x - 84, y), (x - 90, y + 22)], "#e6d8ba")}
+      <path d="M{x + 46} {y - 16} Q{x + 80} {y - 18} {x + 84} {y} Q{x + 80} {y + 18} {x + 46} {y + 16}z" fill="#e6d8ba"/>
+      <circle cx="{x + 68}" cy="{y - 4}" r="5" fill="#2a1610"/>
+    </g>"""
+
+
+def yarn(x, y, uid=""):
+    return f"""
+    <g filter="url(#dof{uid})">
+      <circle cx="{x}" cy="{y}" r="46" fill="#4d5f86"/>
+      <path d="M{x - 40} {y - 10} Q{x} {y + 20} {x + 38} {y - 22} M{x - 44} {y + 12} Q{x} {y + 40} {x + 42} {y + 4} M{x - 10} {y - 44} Q{x + 20} {y} {x + 6} {y + 44}" stroke="#34436a" stroke-width="5" fill="none"/>
+      <path d="M{x - 26} {y - 30} Q{x - 6} {y - 40} {x + 14} {y - 34}" stroke="#8ea3cc" stroke-width="5" fill="none" stroke-linecap="round"/>
+    </g>"""

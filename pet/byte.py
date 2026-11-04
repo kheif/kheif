@@ -105,7 +105,7 @@ def mood(state):
 
 
 STATUS = {
-    "hungry": "hungry. staring at the bowl.",
+    "hungry": "hungry. the last fish did not last.",
     "asleep": "asleep. do not.",
     "happy": "purring. a rare event.",
     "bored": "bored. the yarn is right there.",
@@ -127,52 +127,27 @@ def write_diary(state, kind, user=None):
 
 
 def props(m):
-    """Things around the cat that depend on the mood."""
+    """Foreground objects that depend on the mood, out of focus."""
     if m == "hungry":
-        return f"""
-  <g transform="translate(190 300)">
-    <ellipse cx="0" cy="0" rx="30" ry="6" fill="#000" opacity=".35"/>
-    <path class="ln" d="M-28 -16 Q0 -8 28 -16 L22 -2 Q0 4 -22 -2z" fill="#8a9aa6" stroke-width="3"/>
-    <ellipse class="ln" cx="0" cy="-16" rx="28" ry="6" fill="#3a3530" stroke-width="3"/>
-    <path d="M-24 -12 Q-12 -6 0 -8" stroke="#dfe8ee" stroke-width="2" fill="none" opacity=".6"/>
-  </g>
-  <text x="392" y="70" font-family="{C.SERIF}" font-style="italic" font-size="22" fill="{C.TEXT}" class="rise" style="animation-duration:2.6s">mew.</text>"""
+        return C.fish_bones(120, 280)
     if m == "bored":
-        return f"""
-  <g transform="translate(186 284)">
-    <ellipse cx="2" cy="16" rx="22" ry="5" fill="#000" opacity=".35"/>
-    <circle class="ln" r="18" fill="#5f7fb8" stroke-width="3"/>
-    <path d="M-14 -8 Q0 4 14 -10 M-17 2 Q0 14 16 0 M-10 12 Q2 18 12 10 M-4 -17 Q8 -2 6 16" stroke="#2f4a7a" stroke-width="2" fill="none"/>
-    <path d="M-6 -12 Q2 -14 8 -10" stroke="#a9c3ef" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-    <path d="M16 8 C40 20 60 4 84 14" stroke="#5f7fb8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  </g>"""
-    if m == "happy":
-        out = []
-        for i, (x, y, sc) in enumerate([(392, 92, 1), (360, 60, 0.7), (410, 40, 0.55)]):
-            out.append(
-                f'<g transform="translate({x} {y}) scale({sc})"><path class="rise ln" style="animation-delay:{i * 1.1:.1f}s" '
-                'd="M0 6 C-6 -6 -22 -2 -18 10 C-15 18 -4 22 0 28 C4 22 15 18 18 10 C22 -2 6 -6 0 6z" fill="#e0606e" stroke-width="3"/></g>'
-            )
-        return "".join(out)
+        return C.yarn(470, 300)
     if m == "asleep":
-        out = []
-        for i, (x, y, size) in enumerate([(380, 96, 30), (400, 70, 22), (416, 50, 16)]):
-            out.append(
-                f'<text class="rise" style="animation-delay:{i * 1.1:.1f}s" x="{x}" y="{y}" font-family="{C.SERIF}" '
-                f'font-style="italic" font-weight="700" font-size="{size}" fill="{C.TEXT}">z</text>'
-            )
-        return "".join(out)
+        return "".join(
+            f'<text class="rise" style="animation-delay:{i * 1.3:.1f}s" x="{x}" y="{y}" font-family="{C.SERIF}" '
+            f'font-style="italic" font-size="{size}" fill="{C.TEXT}">z</text>'
+            for i, (x, y, size) in enumerate([(392, 100, 26), (410, 76, 20), (424, 58, 15)])
+        )
     return ""
 
 
 def meter(y, label, value, color):
-    w = 250
-    fill = max(10, round(w * value / 100))
+    w = 220
+    fill = max(8, round(w * value / 100))
     return f"""
     <text x="0" y="{y + 12}" font-family="{C.SERIF}" font-style="italic" font-size="16" fill="{C.MUTED}">{label}</text>
-    <rect x="58" y="{y}" width="{w}" height="14" rx="7" fill="#000" opacity=".35"/>
-    <rect x="58" y="{y}" width="{fill}" height="14" rx="7" fill="{color}"/>
-    <rect x="62" y="{y + 2.5}" width="{max(0, fill - 8)}" height="3.5" rx="1.75" fill="#fff" opacity=".28"/>
+    <rect x="58" y="{y + 3}" width="{w}" height="8" rx="4" fill="#000" opacity=".35"/>
+    <rect x="58" y="{y + 3}" width="{fill}" height="8" rx="4" fill="{color}"/>
     <text x="{58 + w + 14}" y="{y + 12}" font-family="{C.SERIF}" font-size="14" fill="{C.MUTED}">{value}</text>"""
 
 
@@ -180,7 +155,6 @@ def render(state):
     m = mood(state)
     c = state["counts"]
     W, H = 900, 340
-    stack, top = C.books(86, 300)
 
     if state["visitors"]:
         v = state["visitors"][0]
@@ -193,6 +167,7 @@ def render(state):
         f'{c["feed"]} fish, {c["play"]} yarn, {c["pet"]} pets, '
         f'{friends} {"friend" if friends == 1 else "friends"} so far'
     )
+    front = m in ("hungry", "bored")
 
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="byte the cat is {html.escape(STATUS[m])}">
   <defs>
@@ -201,21 +176,17 @@ def render(state):
   </defs>
   <style>{C.CSS}</style>
   <g clip-path="url(#card)">
-    {C.backdrop(W, H, table_y=290)}
-    {C.frame(770, 34, 96, 74)}
-    {stack}
-    {C.candle(86, top + 2)}
-    <ellipse cx="300" cy="300" rx="120" ry="16" fill="#000" opacity=".4" filter="url(#blur)"/>
-    {props(m)}
-    {C.cat(m, x=300, y=298)}
-    {C.motes(22, 480, H)}{C.motes(6, W, H, seed=5)}
+    {C.backdrop(W, H)}
+    {"" if front else props(m)}
+    {C.cat(m, x=270, y=186, scale=1.08)}
+    {props(m) if front else ""}
 
-    <g transform="translate(500 0)">
-      <text x="0" y="86" font-family="{C.SERIF}" font-style="italic" font-size="50" fill="{C.TEXT}">Byte</text>
-      <text x="0" y="118" font-family="{C.SERIF}" font-style="italic" font-size="17" fill="{C.MUTED}">{html.escape(STATUS[m])}</text>
-      {meter(150, "food", state["food"], "#e89a52")}
-      {meter(180, "love", state["love"], "#d9606c")}
-      {meter(210, "nap", state["energy"], "#7f9cc9")}
+    <g transform="translate(540 0)">
+      <text x="0" y="96" font-family="{C.SERIF}" font-style="italic" font-size="46" fill="{C.TEXT}">Byte</text>
+      <text x="0" y="126" font-family="{C.SERIF}" font-style="italic" font-size="17" fill="{C.MUTED}">{html.escape(STATUS[m])}</text>
+      {meter(156, "food", state["food"], "#c98a4e")}
+      {meter(184, "love", state["love"], "#b4545c")}
+      {meter(212, "nap", state["energy"], "#7286a8")}
       <text x="0" y="262" font-family="{C.SERIF}" font-size="14" fill="{C.MUTED}">{last}</text>
       <text x="0" y="284" font-family="{C.SERIF}" font-size="14" fill="{C.MUTED}">{tally}</text>
     </g>

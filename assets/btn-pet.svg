@@ -4,9 +4,9 @@
       <stop offset="0" stop-color="#4a2c19"/><stop offset="1" stop-color="#2a180e"/>
     </linearGradient>
   </defs>
-  <style>.ln { stroke: #1c110b; stroke-linejoin: round; }</style>
+  <style>.ln { stroke: #2a1610; stroke-linejoin: round; }</style>
   <rect x="1.5" y="1.5" width="147" height="45" rx="24" fill="url(#b)" stroke="#000" stroke-opacity=".6" stroke-width="2"/>
   <path d="M24 4 H126" stroke="#ffcf8a" stroke-opacity=".25" stroke-width="2" stroke-linecap="round"/>
-  <g transform="translate(30 24.0) scale(.85)"><path class="ln" d="M0 -3 C-4 -11 -15 -8 -13 1 C-11 7 -3 10 0 15 C3 10 11 7 13 1 C15 -8 4 -11 0 -3z" fill="#d9606c" stroke-width="2.6" transform="translate(0 -3)"/></g>
-  <text x="60" y="30.0" font-family="Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif" font-style="italic" font-size="18" fill="#f1e3c8">pet</text>
+  <g transform="translate(30 24.0) scale(.85)"><path class="ln" d="M0 -3 C-4 -11 -15 -8 -13 1 C-11 7 -3 10 0 15 C3 10 11 7 13 1 C15 -8 4 -11 0 -3z" fill="#b4545c" stroke-width="2" transform="translate(0 -3)"/></g>
+  <text x="60" y="30.0" font-family="Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif" font-style="italic" font-size="18" fill="#eadbc2">pet</text>
 </svg>
