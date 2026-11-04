@@ -1,7 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="140" height="52" viewBox="0 0 140 52" role="img" aria-label="play" shape-rendering="crispEdges">
-  <rect x="7" y="7" width="132" height="44" fill="#2a2320"/>
-  <rect x="1.5" y="1.5" width="131" height="43" fill="#f4ecdf" stroke="#2a2320" stroke-width="3"/>
-  <rect x="1.5" y="1.5" width="8" height="43" fill="#6f8fd1" stroke="#2a2320" stroke-width="3"/>
-  <rect x="28" y="12" width="12" height="3" fill="#2a2320"/><rect x="25" y="15" width="3" height="3" fill="#2a2320"/><rect x="28" y="15" width="6" height="3" fill="#6f8fd1"/><rect x="34" y="15" width="3" height="3" fill="#4b6bb0"/><rect x="37" y="15" width="3" height="3" fill="#6f8fd1"/><rect x="40" y="15" width="3" height="3" fill="#2a2320"/><rect x="22" y="18" width="3" height="3" fill="#2a2320"/><rect x="25" y="18" width="3" height="3" fill="#6f8fd1"/><rect x="28" y="18" width="3" height="3" fill="#4b6bb0"/><rect x="31" y="18" width="9" height="3" fill="#6f8fd1"/><rect x="40" y="18" width="3" height="3" fill="#4b6bb0"/><rect x="22" y="21" width="3" height="3" fill="#2a2320"/><rect x="25" y="21" width="6" height="3" fill="#6f8fd1"/><rect x="31" y="21" width="6" height="3" fill="#4b6bb0"/><rect x="37" y="21" width="6" height="3" fill="#6f8fd1"/><rect x="22" y="24" width="3" height="3" fill="#2a2320"/><rect x="25" y="24" width="3" height="3" fill="#4b6bb0"/><rect x="28" y="24" width="9" height="3" fill="#6f8fd1"/><rect x="37" y="24" width="3" height="3" fill="#4b6bb0"/><rect x="40" y="24" width="3" height="3" fill="#6f8fd1"/><rect x="22" y="27" width="3" height="3" fill="#2a2320"/><rect x="25" y="27" width="6" height="3" fill="#6f8fd1"/><rect x="31" y="27" width="3" height="3" fill="#4b6bb0"/><rect x="34" y="27" width="9" height="3" fill="#6f8fd1"/><rect x="25" y="30" width="3" height="3" fill="#2a2320"/><rect x="28" y="30" width="9" height="3" fill="#6f8fd1"/><rect x="37" y="30" width="3" height="3" fill="#4b6bb0"/><rect x="40" y="30" width="3" height="3" fill="#2a2320"/>
-  <text x="55" y="29.0" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" font-weight="700" fill="#2a2320">play</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="48" viewBox="0 0 150 48" role="img" aria-label="play">
+  <defs>
+    <linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a2c19"/><stop offset="1" stop-color="#2a180e"/>
+    </linearGradient>
+  </defs>
+  <style>.ln { stroke: #1c110b; stroke-linejoin: round; }</style>
+  <rect x="1.5" y="1.5" width="147" height="45" rx="24" fill="url(#b)" stroke="#000" stroke-opacity=".6" stroke-width="2"/>
+  <path d="M24 4 H126" stroke="#ffcf8a" stroke-opacity=".25" stroke-width="2" stroke-linecap="round"/>
+  <g transform="translate(30 24.0) scale(.85)"><circle class="ln" r="11" fill="#5f7fb8" stroke-width="2.6"/>
+               <path d="M-9 -5 Q0 3 9 -6 M-10 2 Q0 9 10 1 M-3 -10 Q5 0 3 10" stroke="#2f4a7a" stroke-width="1.6" fill="none"/></g>
+  <text x="60" y="30.0" font-family="Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif" font-style="italic" font-size="18" fill="#f1e3c8">play</text>
 </svg>
