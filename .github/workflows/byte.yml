@@ -1,10 +1,10 @@
-name: Byte the cat
+name: byte
 
 on:
   issues:
     types: [opened]
   schedule:
-    - cron: "17 */6 * * *" # time passes, Byte gets hungry
+    - cron: "17 */6 * * *" # time passes, byte gets hungry
   workflow_dispatch:
 
 permissions:
@@ -53,14 +53,14 @@ jobs:
           ACTION: ${{ steps.what.outputs.action }}
           USER_LOGIN: ${{ steps.what.outputs.user }}
         run: |
-          git config user.name "byte-the-cat[bot]"
+          git config user.name "byte"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pet/state.json assets/byte.svg README.md
           if git diff --cached --quiet; then exit 0; fi
           if [ "$ACTION" = "tick" ]; then
-            msg="🐈 time passes, Byte stretches"
+            msg="byte: time passes"
           else
-            msg="🐈 @$USER_LOGIN did a $ACTION for Byte"
+            msg="byte: $ACTION from $USER_LOGIN"
           fi
           git commit -m "$msg"
           for i in 1 2 3 4; do

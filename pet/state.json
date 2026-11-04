@@ -1,13 +1,20 @@
 {
-  "fullness": 40,
-  "joy": 55,
+  "food": 45,
+  "love": 55,
   "energy": 70,
-  "updated": 1793793435,
+  "updated": 1793793915,
   "counts": {
     "feed": 0,
     "play": 0,
-    "pet": 0
+    "pet": 0,
+    "diary": 0
   },
   "friends": [],
-  "visitors": []
+  "visitors": [],
+  "diary": [
+    {
+      "at": 1793793842,
+      "text": "moved in today. the rug is acceptable."
+    }
+  ]
 }

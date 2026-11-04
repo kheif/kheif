@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Byte the README cat.
+"""Byte, the cat that lives on this profile.
 
 Visitors open an issue titled "byte|feed", "byte|play" or "byte|pet".
-The GitHub Action runs this script, which updates pet/state.json,
-redraws assets/byte.svg, refreshes the visitor list in README.md and
-writes a thank-you comment to pet/reply.md.
+A GitHub Action runs this script, which updates pet/state.json, redraws
+assets/byte.svg, refreshes README.md and writes the issue reply to
+pet/reply.md.
 
-Usage:
-  python pet/byte.py tick                 # time passes, nothing else
-  python pet/byte.py <action> <username>  # action: feed | play | pet
+  python pet/byte.py tick               time passes
+  python pet/byte.py <action> <user>    action is feed, play or pet
 """
 import html
 import json
@@ -18,36 +17,57 @@ import sys
 import time
 from datetime import datetime, timezone
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sprites as S  # noqa: E402
+from pixel import sprite, word  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE = os.path.join(ROOT, "pet", "state.json")
 SVG = os.path.join(ROOT, "assets", "byte.svg")
 README = os.path.join(ROOT, "README.md")
 REPLY = os.path.join(ROOT, "pet", "reply.md")
 
-ACTIONS = {
-    # action: (fullness, joy, energy)
-    "feed": (28, 6, 4),
-    "play": (-6, 26, -16),
-    "pet": (0, 14, 12),
-}
-VERBS = {"feed": "fed", "play": "played with", "pet": "petted"}
-EMOJI = {"feed": "🐟", "play": "🧶", "pet": "🤗"}
+INK, PAPER, MUTED = "#2a2320", "#f4ecdf", "#8a7f74"
+MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
 
-REPLIES = {
+ACTIONS = {
+    # action: (food, love, energy)
+    "feed": (30, 5, 0),
+    "play": (-5, 25, -20),
+    "pet": (0, 15, 10),
+}
+NOUN = {"feed": "fish", "play": "yarn", "pet": "pets"}
+
+# Byte writes in a diary. Byte is not impressed by much.
+DIARY = {
     "feed": [
-        "*nom nom nom* 🐟 Byte devoured it in 0.3 seconds and is now staring at you for seconds.",
-        "Byte ate the fish, then knocked your coffee off the table as a thank you. 🐟☕",
-        "Delicious! Byte gives this fish 5 stars and a slow blink. 🐟⭐",
+        "{u} brought a fish. i ate it. no further comment.",
+        "fish from {u}. adequate.",
+        "{u} fed me. i will be hungry again in four hours. this is not a threat.",
+        "{u} gave me a fish. i ate half and looked at the other half for a while.",
     ],
     "play": [
-        "Byte went full zoomies mode and attacked the yarn ball like it owed rent. 🧶💨",
-        "The yarn is destroyed. Byte is victorious. You are now Byte's favourite human. 🧶🏆",
-        "Byte did a backflip (probably). 10/10 play session. 🧶✨",
+        "{u} threw the yarn. i caught it. then i ignored it.",
+        "played with {u}. i won.",
+        "{u} has a string. i had no choice.",
+        "{u} wanted to play. i pretended not to, then did.",
     ],
     "pet": [
-        "*purrrrrrrrr* 🤗 Byte headbutted your hand and decided you may stay.",
-        "Byte rolled over to show the belly. It is a trap. You fell for it. It was worth it. 🤗",
-        "Purr level: maximum. Byte is now a loaf of happiness. 🍞🤗",
+        "{u} pet me. i allowed it.",
+        "{u} scratched behind my ears. correct location.",
+        "{u} tried the belly. bold. i respect it.",
+        "{u} pet me exactly three times. i counted.",
+    ],
+    "hungry": [
+        "nobody came. i stared at the bowl until it got dark.",
+        "the bowl is still empty. i am writing this down.",
+    ],
+    "idle": [
+        "knocked a pen off the desk. it had it coming.",
+        "sat in a sunbeam. the sunbeam moved. i did not.",
+        "mehmet was typing. i sat on the keyboard. you are welcome.",
+        "slept 14 hours. productive day.",
+        "saw a bird through the window. told no one.",
     ],
 }
 
@@ -69,194 +89,181 @@ def save(state):
 
 def decay(state, now):
     hours = max(0.0, (now - state.get("updated", now)) / 3600)
-    state["fullness"] = clamp(state["fullness"] - 2.0 * hours)
-    state["joy"] = clamp(state["joy"] - 1.2 * hours)
+    state["food"] = clamp(state["food"] - 2.0 * hours)
+    state["love"] = clamp(state["love"] - 1.2 * hours)
     state["energy"] = clamp(state["energy"] + 2.5 * hours)
     state["updated"] = int(now)
 
 
 def mood(state):
-    if state["fullness"] < 30:
+    if state["food"] < 30:
         return "hungry"
     if state["energy"] < 25:
-        return "sleepy"
-    if state["joy"] >= 70:
+        return "asleep"
+    if state["love"] >= 70:
         return "happy"
-    if state["joy"] < 30:
+    if state["love"] < 30:
         return "bored"
-    return "chill"
+    return "fine"
 
 
-MOOD_TEXT = {
-    "hungry": "is HUNGRY. please. a fish. any fish.",
-    "sleepy": "is sleepy. shhh... zzz",
-    "happy": "is very happy and purring",
-    "bored": "is bored. throw the yarn!",
-    "chill": "is chilling on the cushion",
+STATUS = {
+    "hungry": "hungry. staring at the bowl.",
+    "asleep": "asleep. do not.",
+    "happy": "purring. a rare event.",
+    "bored": "bored. the yarn is right there.",
+    "fine": "fine. tolerating everyone.",
 }
 
 
-# --------------------------------------------------------------------------- svg
+def write_diary(state, kind, user=None):
+    lines = DIARY[kind]
+    n = state["counts"].get("diary", 0)
+    line = lines[n % len(lines)].format(u=user or "someone")
+    state["counts"]["diary"] = n + 1
+    state["diary"].insert(0, {"at": state["updated"], "text": line})
+    state["diary"] = state["diary"][:12]
+    return line
 
 
-def eyes(m):
-    if m == "happy":
-        return (
-            '<path d="M-26 -6 q8 -10 16 0" class="ln"/>'
-            '<path d="M10 -6 q8 -10 16 0" class="ln"/>'
+# --------------------------------------------------------------------- drawing
+
+
+def frames(name, n, dur, seq):
+    """CSS that shows sprite frame seq[i] during slot i of a loop."""
+    css = []
+    slots = len(seq)
+    for f in range(n):
+        on = [i for i, s in enumerate(seq) if s == f]
+        stops = []
+        for i in range(slots):
+            a, b = i * 100 / slots, (i + 1) * 100 / slots - 0.01
+            v = 1 if i in on else 0
+            stops.append(f"{a:.2f}%,{b:.2f}% {{ opacity: {v} }}")
+        css.append(
+            f"@keyframes {name}{f} {{ {' '.join(stops)} }} "
+            f".{name}{f} {{ opacity: 0; animation: {name}{f} {dur}s step-end infinite; }}"
         )
-    if m == "sleepy":
-        return (
-            '<path d="M-26 -4 q8 6 16 0" class="ln"/>'
-            '<path d="M10 -4 q8 6 16 0" class="ln"/>'
-        )
-    big = 9 if m == "hungry" else 7
-    shine = 3 if m == "hungry" else 2.2
-    return (
-        '<g class="blink">'
-        f'<circle cx="-18" cy="-6" r="{big}" fill="#2b2141"/>'
-        f'<circle cx="18" cy="-6" r="{big}" fill="#2b2141"/>'
-        f'<circle cx="-15" cy="-9" r="{shine}" fill="#fff"/>'
-        f'<circle cx="21" cy="-9" r="{shine}" fill="#fff"/>'
-        "</g>"
-    )
+    return "\n    ".join(css)
 
 
-def mouth(m):
+def layers(items, ox, oy, px):
+    return "".join(sprite(r, ox + x * px, oy + y * px, px) for x, y, r in items)
+
+
+def draw_cat(m, ox, oy, px):
+    eyes = {"hungry": "big", "asleep": "sleep", "happy": "happy", "bored": "meh", "fine": "open"}[m]
+    mouth = {"hungry": "open", "asleep": "flat", "happy": "smile", "bored": "flat", "fine": "smile"}[m]
+    out = []
+
+    # tail behind the body, three frames
+    tx, ty = ox + 23 * px, oy + 13 * px
+    for i, t in enumerate(S.TAIL):
+        out.append(f'<g class="tail{i}">{sprite(t, tx, ty, px)}</g>')
+
+    out.append(sprite(S.BODY, ox, oy, px))
+    out.append(layers(S.NOSE, ox, oy, px))
+
     if m == "hungry":
-        return '<ellipse cx="0" cy="12" rx="5" ry="6" fill="#7a2e3a"/>'
+        # mouth goes "mew", eyes stay big
+        out.append(layers(S.EYES[eyes], ox, oy, px))
+        out.append(f'<g class="mew0">{layers(S.MOUTH["smile"], ox, oy, px)}</g>')
+        out.append(f'<g class="mew1">{layers(S.MOUTH["open"], ox, oy, px)}</g>')
+    elif m in ("asleep", "happy"):
+        out.append(layers(S.EYES[eyes], ox, oy, px))
+        out.append(layers(S.MOUTH[mouth], ox, oy, px))
+    else:
+        out.append(f'<g class="blink0">{layers(S.EYES[eyes], ox, oy, px)}</g>')
+        out.append(f'<g class="blink1">{layers(S.EYES["shut"], ox, oy, px)}</g>')
+        out.append(layers(S.MOUTH[mouth], ox, oy, px))
+    return "".join(out)
+
+
+def props(m, ox, oy, px):
+    """Things around the cat that depend on the mood."""
+    if m == "hungry":
+        bowl = sprite(S.BOWL, ox - 15 * px, oy + 21 * px, px)
+        mew = (
+            f'<text class="mew1" x="{ox - 12 * px}" y="{oy + 6 * px}" '
+            f'font-family="{MONO}" font-size="18" font-weight="700" fill="{INK}">mew.</text>'
+        )
+        return bowl + mew
     if m == "bored":
-        return '<path d="M-6 12 h12" class="ln"/>'
-    return '<path d="M-9 9 q4.5 6 9 0 q4.5 6 9 0" class="ln"/>'
-
-
-def extras(m):
+        return sprite(S.YARN, ox - 12 * px, oy + 17 * px, px)
     if m == "happy":
-        hearts = []
-        for i, (x, d) in enumerate([(-70, 0), (60, 1.2), (-40, 2.4)]):
-            hearts.append(
-                f'<g transform="translate({x} -70)"><path class="heart" style="animation-delay:{d}s" '
-                'd="M0 4 C-8 -6 -18 2 0 14 C18 2 8 -6 0 4z" fill="#ff7aa8"/></g>'
+        out = []
+        for i, (x, y) in enumerate([(-8, 2), (28, -1), (-4, -3)]):
+            out.append(
+                f'<g class="rise" style="animation-delay:{i * 1.1:.1f}s">'
+                f"{sprite(S.HEART, ox + x * px, oy + y * px, px // 2)}</g>"
             )
-        return "".join(hearts)
-    if m == "sleepy":
+        return "".join(out)
+    if m == "asleep":
         return (
-            '<text class="zz" x="56" y="-60" font-size="22">z</text>'
-            '<text class="zz" style="animation-delay:1s" x="70" y="-74" font-size="16">z</text>'
-            '<text class="zz" style="animation-delay:2s" x="82" y="-86" font-size="12">z</text>'
-        )
-    if m == "hungry":
-        return (
-            '<g class="bubble" transform="translate(62 -92)">'
-            '<rect x="-4" y="-22" width="70" height="40" rx="18" fill="#fff4e6"/>'
-            '<path d="M6 14 l-10 14 l18 -10z" fill="#fff4e6"/>'
-            '<path d="M14 -2 q14 -14 30 0 q-16 14 -30 0z" fill="#6ec6ff"/>'
-            '<path d="M44 -2 l10 -8 v16z" fill="#6ec6ff"/>'
-            '<circle cx="22" cy="-4" r="2" fill="#2b2141"/>'
-            "</g>"
-        )
-    if m == "bored":
-        return (
-            '<g transform="translate(-100 70)">'
-            '<circle r="16" fill="#ff9ec7"/>'
-            '<path d="M-12 -8 q12 8 24 0 M-14 2 q14 8 28 0 M-10 10 q10 5 20 0" '
-            'stroke="#e46b9d" stroke-width="2" fill="none"/>'
-            "</g>"
+            f'<g class="rise">{sprite(S.ZED, ox + 27 * px, oy + 2 * px, px // 2 + 1)}</g>'
+            f'<g class="rise" style="animation-delay:1.6s">{sprite(S.ZED_S, ox + 31 * px, oy - 2 * px, px // 2)}</g>'
         )
     return ""
 
 
-def bar(y, label, value, color):
-    w = int(260 * value / 100)
-    return (
-        f'<text x="0" y="{y}" class="lbl">{label}</text>'
-        f'<rect x="96" y="{y - 13}" width="260" height="16" rx="8" fill="#ffffff" fill-opacity=".08"/>'
-        f'<rect class="fill" x="96" y="{y - 13}" width="{max(w, 16)}" height="16" rx="8" fill="{color}"/>'
-        f'<text x="368" y="{y}" class="num">{value}</text>'
-    )
+def meter(x, y, label, value, color):
+    filled = round(value / 10)
+    out = [
+        f'<text x="{x}" y="{y + 13}" font-family="{MONO}" font-size="14" fill="{MUTED}">{label}</text>'
+    ]
+    for i in range(10):
+        sx = x + 64 + i * 22
+        if i < filled:
+            out.append(f'<rect x="{sx}" y="{y}" width="18" height="18" fill="{color}"/>')
+            out.append(f'<rect x="{sx}" y="{y + 14}" width="18" height="4" fill="{INK}" fill-opacity=".18"/>')
+        else:
+            out.append(
+                f'<rect x="{sx + 1.5}" y="{y + 1.5}" width="15" height="15" fill="none" '
+                f'stroke="{INK}" stroke-opacity=".25" stroke-width="3"/>'
+            )
+    return "".join(out)
 
 
 def render(state):
     m = mood(state)
     c = state["counts"]
-    last = state["visitors"][0] if state["visitors"] else None
-    if last:
-        who = html.escape(last["user"])
-        last_line = f'last visitor: @{who} {VERBS[last["action"]]} Byte'
+    px = 8
+    W, H = 900, 290
+    cx, cy = 150, 38  # cat origin
+
+    tail_speed = {"happy": 0.9, "asleep": 4.0, "bored": 2.6}.get(m, 1.6)
+    name, _ = word("byte", 470, 30, 6, INK)
+
+    last = ""
+    if state["visitors"]:
+        v = state["visitors"][0]
+        when = datetime.fromtimestamp(v["at"], timezone.utc).strftime("%b %d").lower()
+        last = f"last visit: {html.escape(v['user'])}, {NOUN[v['action']]}, {when}"
     else:
-        last_line = "no visitors yet. be the first!"
-    breath = "3.2s" if m != "sleepy" else "5s"
-    tail = "1.4s" if m in ("happy", "bored") else "3s"
+        last = "no visitors yet."
 
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300" viewBox="0 0 900 300" role="img" aria-label="Byte the cat {html.escape(MOOD_TEXT[m])}">
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="byte the cat is {html.escape(STATUS[m])}" shape-rendering="crispEdges">
   <style>
-    .sans {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }}
-    .mono {{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
-    .ln {{ stroke: #2b2141; stroke-width: 3.5; fill: none; stroke-linecap: round; }}
-    .lbl {{ font: 600 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #c9b8ff; }}
-    .num {{ font: 700 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #fff4e6; }}
-    @keyframes breathe {{ 0%,100% {{ transform: scale(1,1) }} 50% {{ transform: scale(1.03,.97) }} }}
-    .body {{ transform-box: fill-box; transform-origin: 50% 100%; animation: breathe {breath} ease-in-out infinite; }}
-    @keyframes tail {{ 0%,100% {{ transform: rotate(-10deg) }} 50% {{ transform: rotate(14deg) }} }}
-    .tail {{ transform-box: fill-box; transform-origin: 0% 100%; animation: tail {tail} ease-in-out infinite; }}
-    @keyframes blink {{ 0%,92%,100% {{ transform: scaleY(1) }} 95% {{ transform: scaleY(.1) }} }}
-    .blink {{ transform-box: fill-box; transform-origin: center; animation: blink 4s infinite; }}
-    @keyframes ear {{ 0%,86%,100% {{ transform: rotate(0) }} 90% {{ transform: rotate(-12deg) }} 94% {{ transform: rotate(4deg) }} }}
-    .ear {{ transform-box: fill-box; transform-origin: 50% 100%; animation: ear 5s infinite; }}
-    @keyframes float {{ 0% {{ opacity: 0; transform: translateY(10px) scale(.6) }} 25% {{ opacity: 1 }} 100% {{ opacity: 0; transform: translateY(-40px) scale(1.1) }} }}
-    .heart {{ transform-box: fill-box; animation: float 3.6s ease-out infinite; opacity: 0; }}
-    .zz {{ font: 700 20px -apple-system, "Segoe UI", Arial, sans-serif; fill: #c9b8ff; animation: float 3s ease-out infinite; opacity: 0; }}
-    @keyframes bob {{ 0%,100% {{ transform: translate(62px,-92px) }} 50% {{ transform: translate(62px,-98px) }} }}
-    .bubble {{ animation: bob 1.6s ease-in-out infinite; }}
-    @keyframes grow {{ from {{ transform: scaleX(0) }} to {{ transform: scaleX(1) }} }}
-    .fill {{ transform-box: fill-box; transform-origin: 0 50%; animation: grow 1.2s cubic-bezier(.2,.9,.3,1.2) both; }}
+    {frames("tail", 3, tail_speed, [0, 1, 0, 2])}
+    {frames("blink", 2, 4.5, [0] * 14 + [1])}
+    {frames("mew", 2, 1.8, [0, 0, 1])}
+    @keyframes rise {{ 0% {{ transform: translateY(0); opacity: 0 }} 15% {{ opacity: 1 }} 100% {{ transform: translateY(-40px); opacity: 0 }} }}
+    .rise {{ opacity: 0; animation: rise 3.2s steps(10) infinite; }}
   </style>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2b2141"/><stop offset="1" stop-color="#16182b"/>
-    </linearGradient>
-  </defs>
-  <rect width="900" height="300" rx="24" fill="url(#bg)"/>
+  <rect x="3" y="3" width="{W - 6}" height="{H - 6}" rx="14" fill="{PAPER}" stroke="{INK}" stroke-width="3"/>
 
-  <!-- the cat -->
-  <g transform="translate(220 196)">
-    <ellipse cx="0" cy="62" rx="150" ry="22" fill="#6f4ea8"/>
-    <ellipse cx="0" cy="54" rx="140" ry="20" fill="#8b6cc4"/>
-    {extras(m)}
-    <path class="tail" d="M70 40 q50 -10 46 -60 q-2 -16 12 -14 q14 4 6 30 q-8 50 -60 60z" fill="#f4a259"/>
-    <g class="body">
-      <ellipse cx="0" cy="22" rx="92" ry="44" fill="#f4a259"/>
-      <path d="M-40 -6 q8 18 0 40 M-16 -12 q8 20 0 46 M40 -6 q-8 18 0 40" stroke="#e08a3e" stroke-width="6" fill="none" stroke-linecap="round"/>
-      <ellipse cx="-50" cy="58" rx="20" ry="10" fill="#fbd3a6"/>
-      <ellipse cx="50" cy="58" rx="20" ry="10" fill="#fbd3a6"/>
-      <g transform="translate(0 -30)">
-        <path class="ear" d="M-58 -20 l6 -46 l34 26z" fill="#f4a259"/>
-        <path class="ear" d="M-50 -26 l4 -28 l18 16z" fill="#ffb3c7"/>
-        <path d="M58 -20 l-6 -46 l-34 26z" fill="#f4a259"/>
-        <path d="M50 -26 l-4 -28 l-18 16z" fill="#ffb3c7"/>
-        <ellipse cx="0" cy="0" rx="64" ry="50" fill="#f4a259"/>
-        <path d="M-10 -48 q4 12 0 20 M0 -50 q4 12 0 22 M10 -48 q4 12 0 20" stroke="#e08a3e" stroke-width="4" fill="none" stroke-linecap="round"/>
-        <ellipse cx="-36" cy="12" rx="10" ry="6" fill="#ff8fab" fill-opacity=".6"/>
-        <ellipse cx="36" cy="12" rx="10" ry="6" fill="#ff8fab" fill-opacity=".6"/>
-        {eyes(m)}
-        <path d="M-4 4 h8 l-4 5z" fill="#ff6f91"/>
-        {mouth(m)}
-        <path d="M-30 6 h-26 M-30 12 l-24 6 M30 6 h26 M30 12 l24 6" stroke="#2b2141" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
-      </g>
-    </g>
-  </g>
+  {sprite(S.RUG, cx - 4 * px, cy + 23 * px, px)}
+  {props(m, cx, cy, px)}
+  {draw_cat(m, cx, cy, px)}
 
-  <!-- stats -->
-  <g transform="translate(470 0)">
-    <text x="0" y="62" class="sans" font-size="34" font-weight="800" fill="#fff4e6">Byte</text>
-    <text x="96" y="62" class="sans" font-size="16" fill="#a99dd0">{html.escape(MOOD_TEXT[m])}</text>
-    <g transform="translate(0 112)">
-      {bar(0, "food", state["fullness"], "#ffb86b")}
-      {bar(36, "love", state["joy"], "#ff7aa8")}
-      {bar(72, "nap", state["energy"], "#7ad0ff")}
-    </g>
-    <text x="0" y="236" class="mono" font-size="14" fill="#a99dd0">{last_line}</text>
-    <text x="0" y="262" class="mono" font-size="14" fill="#8b7fb8">fish {c["feed"]}  ·  yarn {c["play"]}  ·  pets {c["pet"]}  ·  friends {len(state["friends"])}</text>
+  <g>
+    {name}
+    <text x="470" y="104" font-family="{MONO}" font-size="15" fill="{INK}">{html.escape(STATUS[m])}</text>
+    {meter(470, 128, "food", state["food"], "#e8964a")}
+    {meter(470, 158, "love", state["love"], "#e05a6b")}
+    {meter(470, 188, "nap", state["energy"], "#6f8fd1")}
+    <text x="470" y="242" font-family="{MONO}" font-size="13" fill="{MUTED}">{last}</text>
+    <text x="470" y="264" font-family="{MONO}" font-size="13" fill="{MUTED}">{c["feed"]} fish, {c["play"]} yarn, {c["pet"]} pets, {len(state["friends"])} {"friend" if len(state["friends"]) == 1 else "friends"} so far</text>
   </g>
 </svg>
 """
@@ -265,22 +272,41 @@ def render(state):
 # ---------------------------------------------------------------------- readme
 
 
+def replace_block(text, tag, body):
+    return re.sub(
+        rf"<!-- {tag}:START -->.*?<!-- {tag}:END -->",
+        lambda _: f"<!-- {tag}:START -->\n{body}\n<!-- {tag}:END -->",
+        text,
+        flags=re.S,
+    )
+
+
 def update_readme(state):
     if not os.path.exists(README):
         return
     with open(README, encoding="utf-8") as f:
         text = f.read()
-    rows = []
-    for v in state["visitors"][:5]:
-        user = v["user"]
-        date = datetime.fromtimestamp(v["at"], timezone.utc).strftime("%b %d")
-        rows.append(
-            f"{EMOJI[v['action']]} [@{user}](https://github.com/{user}) "
-            f"{VERBS[v['action']]} Byte <sub>{date}</sub>"
-        )
-    body = "<br>\n".join(rows) if rows else "<i>nobody yet. be the first one!</i>"
-    block = f"<!-- BYTE:START -->\n{body}\n<!-- BYTE:END -->"
-    text = re.sub(r"<!-- BYTE:START -->.*?<!-- BYTE:END -->", lambda _: block, text, flags=re.S)
+
+    seen, people = set(), []
+    for v in state["visitors"]:
+        if v["user"] not in seen:
+            seen.add(v["user"])
+            people.append(f'<a href="https://github.com/{v["user"]}"><img src="https://github.com/{v["user"]}.png?size=64" width="32" height="32" alt="{v["user"]}" title="{v["user"]}"></a>')
+        if len(people) == 12:
+            break
+    regulars = " ".join(people) if people else "<sub>nobody yet.</sub>"
+
+    if state["diary"]:
+        lines = []
+        for d in state["diary"][:8]:
+            day = datetime.fromtimestamp(d["at"], timezone.utc).strftime("%b %d").lower()
+            lines.append(f"{day}  {d['text']}")
+        diary = "```text\n" + "\n".join(lines) + "\n```"
+    else:
+        diary = "```text\n(empty. byte has not written anything yet.)\n```"
+
+    text = replace_block(text, "BYTE", regulars)
+    text = replace_block(text, "DIARY", diary)
     with open(README, "w", encoding="utf-8") as f:
         f.write(text)
 
@@ -299,32 +325,36 @@ def main():
     decay(state, now)
 
     if action in ACTIONS:
-        user = args[1] if len(args) > 1 else "someone"
-        if not re.fullmatch(r"[A-Za-z0-9-]{1,39}(\[bot\])?", user):
-            user = "someone"
-        df, dj, de = ACTIONS[action]
-        state["fullness"] = clamp(state["fullness"] + df)
-        state["joy"] = clamp(state["joy"] + dj)
+        user = args[1] if len(args) > 1 else ""
+        if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", user):
+            print("refusing: not a github login")
+            sys.exit(2)
+        df, dl, de = ACTIONS[action]
+        state["food"] = clamp(state["food"] + df)
+        state["love"] = clamp(state["love"] + dl)
         state["energy"] = clamp(state["energy"] + de)
         state["counts"][action] += 1
         if user not in state["friends"]:
             state["friends"].append(user)
         state["visitors"].insert(0, {"user": user, "action": action, "at": int(now)})
-        state["visitors"] = state["visitors"][:10]
+        state["visitors"] = state["visitors"][:30]
+        line = write_diary(state, action, user)
 
-        total = sum(state["counts"].values())
-        pick = REPLIES[action][total % len(REPLIES[action])]
-        m = mood(state)
+        def bar(v):
+            return "▮" * round(v / 10) + "▯" * (10 - round(v / 10))
+
         with open(REPLY, "w", encoding="utf-8") as f:
             f.write(
-                f"Hey @{user}! {pick}\n\n"
-                f"| food | love | nap |\n|:-:|:-:|:-:|\n"
-                f"| {state['fullness']} | {state['joy']} | {state['energy']} |\n\n"
-                f"Byte {MOOD_TEXT[m]}. You are friend **#{state['friends'].index(user) + 1}** "
-                f"and this was interaction **#{total}**. "
-                f"Your name is on the [profile](https://github.com/kheif) now, go take a look! 🐾\n"
+                f"from byte's diary:\n\n> {line}\n\n"
+                f"```text\nfood {bar(state['food'])}\nlove {bar(state['love'])}\nnap  {bar(state['energy'])}\n```\n\n"
+                f"<sub>you're on the profile now, top of the regulars list. come back when byte gets hungry.</sub>\n"
             )
-    elif action != "tick":
+    elif action == "tick":
+        # at most one diary entry a day when nobody shows up
+        last = state["diary"][0]["at"] if state["diary"] else 0
+        if now - last > 20 * 3600:
+            write_diary(state, "hungry" if mood(state) == "hungry" else "idle")
+    else:
         print(f"unknown action: {action}")
         sys.exit(2)
 
