@@ -454,8 +454,8 @@ BODY = (
     "C56 -152 108 -116 116 -66 "
     "C120 -36 114 -12 100 -6z"
 )
-TAIL_A = ((-146, -30), (-182, -30), (-194, -2), (-150, 2))
-TAIL_B = ((-150, 2), (-106, 5), (-54, 6), (-20, -12))
+TAIL_A = ((-136, -36), (-178, -36), (-198, -4), (-152, 3))
+TAIL_B = ((-152, 3), (-106, 9), (-54, 10), (-22, -16))
 HEAD_X, HEAD_Y, HEAD_S = 44, -104, 1.18
 
 # head turned three quarters to the viewer's left: the right side is
@@ -670,7 +670,7 @@ def b_face(mood):
         out.append(hair((n - 8, 27), (n - 3.5, 30.5), (n + 1, 25.5), 1.3, "#6a2c2a", .9))
         out.append(hair((n + 1, 25.5), (n + 6, 31), (n + 12, 26 - lift), 1.4, "#6a2c2a", .9))
     # freckle dots on the muzzle, as in the references
-    for dx, dy in [(14, 27), (20, 31), (14, 34), (-12, 28), (-17, 32)]:
+    for dx, dy in [(13, 27), (19, 30.5), (13.5, 34), (-13, 27), (-19, 30.5), (-13.5, 34)]:
         p = T((dx, dy))
         out.append(f'<circle cx="{p[0]}" cy="{p[1]}" r="1.4" fill="{B_FUR_DARK}" opacity=".75"/>')
     # whiskers: long, thin, slightly curved; each one different
@@ -731,36 +731,61 @@ def b_head(mood, uid):
 # ---- body
 
 def b_tail():
+    """The tail leaves the hip from behind the rump and curls along the
+    front of the body. Its start fades into the fur through a feathered
+    mask, so there is no cut where it emerges."""
     pts, ws = [], []
-    for seg, w0, w1, n in [(TAIL_A, 28, 25, 12), (TAIL_B, 25, 16, 18)]:
+    for seg, w0, w1, n in [(TAIL_A, 26, 24, 14), (TAIL_B, 24, 15, 20)]:
         for i in range(n + (seg is TAIL_B)):
             t = i / n
             pts.append(_cubic(*seg, t))
             ws.append(w0 * (1 - t) + w1 * t)
-    for k, f in zip(range(1, 6), (0.3, 0.55, 0.72, 0.85, 0.94)):
+    for k, f in zip(range(1, 7), (0.35, 0.6, 0.76, 0.87, 0.94, 0.98)):
         ws[-k] *= f
     d = _ribbon(pts, ws)
-    rings = []
-    for idx in (8, 15, 21, 26):
-        (x, y), (x2, y2) = pts[idx], pts[idx + 1]
+
+    def edge(i, side):
+        (x, y), (x2, y2) = pts[i], pts[min(i + 1, len(pts) - 1)]
+        if i == len(pts) - 1:
+            (x, y), (x2, y2) = pts[i - 1], pts[i]
         ang = math.atan2(y2 - y, x2 - x) + math.pi / 2
-        hw = ws[idx] / 2
-        c, s_ = math.cos(ang) * hw, math.sin(ang) * hw
-        rings.append(stroke((x - c, y - s_), (x + 4, y), (x + c, y + s_), 9, B_STRIPE, .8, taper=(0.3, 0.3)))
+        h = ws[i] / 2 * side
+        return (pts[i][0] + math.cos(ang) * h, pts[i][1] + math.sin(ang) * h)
+
+    # soft bands that wrap round the tail
+    rings = "".join(
+        stroke(edge(i, -1), ((edge(i, -1)[0] + edge(i, 1)[0]) / 2 + 4, (edge(i, -1)[1] + edge(i, 1)[1]) / 2),
+               edge(i, 1), 9, B_STRIPE, .75, taper=(0.2, 0.2))
+        for i in (10, 17, 23, 28)
+    )
+    under = "".join(stroke(edge(a, 1), edge((a + b) // 2, 1), edge(b, 1), 6, B_FUR_DARK, .7)
+                    for a, b in [(6, 16), (16, 26), (26, 33)])
+    top_light = stroke(edge(16, -1), edge(24, -1), edge(32, -1), 4, B_FUR_LIT, .7)
+    # the kesisim line: where the tail lies in front of the body
+    overlap = hair(edge(15, -1), edge(22, -1), edge(30, -1), 1.5, B_LINE, .6)
     return f"""
+    <clipPath id="tailbody"><path d="{BODY}"/></clipPath>
+    <filter id="tailfeather" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.4"/></filter>
+    <linearGradient id="b-tailfur" x1="-200" y1="0" x2="-20" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="{B_FUR_DARK}"/>
+      <stop offset=".3" stop-color="{B_FUR}"/>
+      <stop offset=".75" stop-color="{B_FUR}"/>
+      <stop offset="1" stop-color="{B_FUR_DARK}"/>
+    </linearGradient>
     <mask id="tailmask" maskUnits="userSpaceOnUse" x="-260" y="-200" width="420" height="240">
       <rect x="-260" y="-200" width="420" height="240" fill="#fff"/>
-      <path d="{BODY}" fill="#000"/>
-      <rect x="-150" y="-12" width="200" height="30" fill="#fff"/>
-      <path d="M-60 -12 L10 -12 L10 -30 L-60 -30z" fill="#fff"/>
+      <!-- hidden: the part inside the body that is not in front of it -->
+      <g filter="url(#tailfeather)"><g clip-path="url(#tailbody)">
+        <rect x="-260" y="-200" width="160" height="186" fill="#000"/>
+      </g></g>
     </mask>
     <g class="tail" mask="url(#tailmask)">
       <g filter="url(#crayon)">
-        <path d="{d}" fill="url(#b-tail)"/>
-        <g filter="url(#blurband)">{"".join(rings)}</g>
+        <path d="{d}" fill="url(#b-tailfur)"/>
+        <clipPath id="tailclip"><path d="{d}"/></clipPath>
+        <g clip-path="url(#tailclip)"><g filter="url(#blurband)">{under}{rings}{top_light}</g></g>
       </g>
-      {hair(pts[2], pts[6], pts[11], 1.4, B_LINE, .55)}
-      {stroke(pts[14], pts[20], pts[26], 3, B_FUR_LIT, .55)}
+      {overlap}
     </g>"""
 
 
