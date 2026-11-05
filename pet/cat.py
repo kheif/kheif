@@ -157,39 +157,51 @@ def blink_css(lid, closed=38, period=5.5):
 
 # ------------------------------------------------------------------ head
 
-# Head in local coordinates, 3/4 view turned towards the viewer's left.
-# The near side (left) is lit, the far side (right) falls into shadow.
-HEAD = [
-    (-96, -38), (-112, -148), (-36, -84),       # near ear
-    (-4, -92), (26, -92),                       # flat crown
-    (80, -146), (98, -46),                      # far ear
-    (110, -8), (128, 22), (104, 34), (116, 56), (84, 60),   # far cheek tufts
-    (44, 88), (-12, 100),                       # jaw to chin
-    (-58, 84), (-104, 70), (-130, 52), (-104, 38), (-138, 14), (-104, 2),  # near cheek tufts
-]
+# The head is designed straight on and symmetric, then turned a little
+# towards the viewer's left with one transform, so every feature agrees
+# on the same angle: the far (left) half is narrowed, the centre line
+# moves left with it. Light comes from the upper left; the near (right)
+# side falls into shadow.
+TURN_CENTRE = -6
+FAR_SCALE = 0.92   # left half, turning away
+NEAR_SCALE = 1.0   # right half, closer to us
 
-HEAD_BENDS = [
-    0.04, 0.02, 0.1, 0.06, 0.03, 0.02, 0.1,
-    0.06, 0, 0, 0, 0.04, 0.08, 0.08,
-    0.06, 0, 0, 0, 0, 0.04,
-]
 
-NEAR_EAR_IN = [(-92, -50), (-104, -128), (-48, -84)]
-FAR_EAR_IN = [(36, -92), (76, -132), (88, -56)]
+def T(p):
+    x, y = p
+    return (round(TURN_CENTRE + x * (FAR_SCALE if x < 0 else NEAR_SCALE), 1), y)
 
-# shadow plane: the far side of the face, cut along the nose bridge
-SHADOW = [
-    (40, -96), (80, -146), (98, -46), (110, -8), (128, 22), (104, 34), (116, 56),
-    (84, 60), (44, 88), (24, 94), (40, 66), (50, 40), (34, 16), (30, -20), (44, -60),
-]
-# a deeper core shadow just past the terminator
-CORE = [(44, -60), (30, -20), (34, 16), (50, 40), (40, 66), (24, 94), (36, 92), (56, 62), (52, 18), (44, -16), (54, -64)]
 
-MUZZLE = [(-70, 40), (-36, 20), (-6, 18), (28, 30), (46, 52), (32, 80), (-12, 96), (-50, 84)]
-MUZZLE_SHADE = [(10, 22), (28, 30), (46, 52), (32, 80), (-4, 94), (14, 70), (20, 46)]
-CHIN_SHADE = [(-50, 84), (-12, 96), (32, 80), (20, 92), (-12, 102), (-46, 92)]
+def TT(points):
+    return [T(p) for p in points]
 
-NOSE = [(-40, 16), (-6, 14), (-20, 34)]
+
+def mirror(points):
+    """Mirror a clockwise point list to the other side, keeping it clockwise."""
+    return [(-x, y) for x, y in reversed(points)]
+
+
+_RIGHT = [(0, -92), (38, -86), (104, -148), (100, -40), (110, -6), (132, 16),
+          (106, 32), (124, 52), (98, 64), (52, 88)]
+_RIGHT_BENDS = [0.03, 0.02, 0.06, 0.06, 0, 0, 0, 0, 0.08, 0.06]
+HEAD = TT(_RIGHT + [(0, 100)] + [(-x, y) for x, y in reversed(_RIGHT[1:])])
+HEAD_BENDS = _RIGHT_BENDS + _RIGHT_BENDS[::-1]
+
+EAR_R = [(38, -86), (104, -148), (100, -40), (70, -64)]
+EAR_IN_R = [(50, -84), (96, -128), (92, -54)]
+
+SHADOW = [(44, -94), (104, -148), (100, -40), (110, -6), (132, 16), (106, 32), (124, 52),
+          (98, 64), (52, 88), (30, 98), (46, 66), (56, 40), (40, 14), (30, -20), (36, -56)]
+SHADOW_BENDS = [0] * 9 + [0.04, -0.06, 0.06, -0.06, -0.06, -0.06]
+CORE = [(36, -56), (30, -20), (40, 14), (56, 40), (46, 66), (30, 98), (42, 96), (62, 62), (60, 16), (48, -18), (48, -60)]
+
+MUZZLE = [(0, 18), (30, 22), (52, 40), (48, 66), (28, 86), (0, 94), (-28, 86), (-48, 66), (-52, 40), (-30, 22)]
+MUZZLE_LIT = [(-52, 40), (-30, 22), (0, 18), (-10, 34), (-44, 58)]
+MUZZLE_SHADE = [(14, 22), (30, 22), (52, 40), (48, 66), (28, 86), (6, 92), (20, 66), (26, 44)]
+CHIN_SHADE = [(-28, 86), (0, 94), (28, 86), (18, 98), (0, 104), (-22, 98)]
+NOSE = [(-16, 14), (16, 14), (0, 30)]
+
+EYE_X, EYE_Y, EYE_W, EYE_H = 46, -8, 25, 17
 
 
 def eye(cx, cy, w, h, mood, uid, name, look):
@@ -229,84 +241,93 @@ def head(mood, uid):
     lid = {"fine": 15, "bored": 20, "hungry": 2}.get(mood, 15)
     look = {"fine": 5, "bored": 7, "hungry": 0}.get(mood, 4)
     out = []
+    line = f'stroke="{LINE}" stroke-width="2.6" stroke-linejoin="round"'
 
-    # ears behind the head shape
-    out.append(f'<g class="ear">{shape(HEAD[0:3] + [(-60, -60)], [0.04, 0.02, 0], FUR, f'stroke="{LINE}" stroke-width="2.6" stroke-linejoin="round"')}{shape(NEAR_EAR_IN, [0.03, 0.04, 0], EAR_IN)}'
-               f'{brush((-96, -60), (-100, -96), (-104, -122), 3, CREAM_LIT, .7)}'
-               f'{brush((-86, -60), (-86, -88), (-90, -110), 2.4, CREAM_LIT, .55)}</g>')
-    out.append(shape(HEAD[4:7] + [(60, -70)], [0.03, 0.02, 0], FUR_SHADE, f'stroke="{LINE}" stroke-width="2.6" stroke-linejoin="round"') + shape(FAR_EAR_IN, [0.03, 0.04, 0], FUR_DEEP))
+    def b(p0, p1, p2, *args, **kw):
+        out.append(brush(T(p0), T(p1), T(p2), *args, **kw))
+
+    # ears behind the head
+    out.append(
+        f'<g class="ear">{shape(TT(mirror(EAR_R)), [0, 0.06, 0.02, 0], FUR, line)}'
+        f'{shape(TT(mirror(EAR_IN_R)), [0.04, 0.03, 0], EAR_IN)}'
+        f'{brush(T((-90, -58)), T((-94, -94)), T((-98, -120)), 3, CREAM_LIT, .7)}'
+        f'{brush(T((-80, -60)), T((-82, -88)), T((-86, -110)), 2.4, CREAM_LIT, .55)}</g>'
+    )
+    out.append(shape(TT(EAR_R), [0.02, 0.06, 0, 0], FUR_SHADE, line)
+               + shape(TT(EAR_IN_R), [0.03, 0.04, 0], FUR_DEEP))
 
     # face planes
     out.append(shape(HEAD, HEAD_BENDS, FUR))
     out.append(f'<clipPath id="hc{uid}">{shape(HEAD, HEAD_BENDS, "#000")}</clipPath>')
     out.append(f'<g clip-path="url(#hc{uid})">')
-    out.append(shape([(-108, -84), (14, -98), (16, -44), (-34, -40), (-118, -6)], [0.04, 0.12, 0.1, 0.12, 0.04], FUR_LIT, 'opacity=".8"'))
-    out.append(shape(SHADOW, [0, 0, 0, 0, 0, 0, 0, 0, 0, -0.1, -0.06, 0.08, -0.06, -0.06, -0.06], FUR_SHADE))
-    out.append(shape(CORE, [-0.06] * 11, FUR_DEEP, 'opacity=".5"'))
-    out.append(shape([(-92, -28), (-34, -40), (-24, -30), (-90, -20)], [0.12, 0, -0.1, 0], FUR_SHADE, 'opacity=".55"'))
-    out.append(shape([(14, -36), (58, -42), (66, -30), (16, -26)], [0.12, 0, -0.1, 0], FUR_DEEP, 'opacity=".45"'))
-    out.append(shape(MUZZLE, [0.1, 0.06, 0.08, 0.1, 0.08, 0.06, 0.06, 0.1], CREAM))
-    out.append(shape([(-66, 42), (-36, 22), (-8, 20), (-24, 40), (-56, 58)], [0.1, 0.05, -0.1, -0.1, 0.1], CREAM_LIT, 'opacity=".9"'))
-    out.append(shape(MUZZLE_SHADE, [0.06, 0.08, 0.1, 0.06, -0.06, -0.08, -0.08], CREAM_SHADE))
-    out.append(poly(CHIN_SHADE, FUR_DEEP, 'opacity=".45"'))
+    out.append(shape(TT([(-104, -84), (10, -96), (18, -46), (-30, -40), (-118, -8)]),
+                     [0.04, 0.12, 0.1, 0.12, 0.04], FUR_LIT, 'opacity=".8"'))
+    out.append(shape(TT(SHADOW), SHADOW_BENDS, FUR_SHADE))
+    out.append(shape(TT(CORE), [-0.06] * 11, FUR_DEEP, 'opacity=".5"'))
+    brow = [(-84, -30), (-28, -40), (-20, -30), (-82, -20)]
+    out.append(shape(TT(brow), [0.12, 0, -0.1, 0], FUR_SHADE, 'opacity=".55"'))
+    out.append(shape(TT(mirror(brow)), [0, -0.1, 0, 0.12], FUR_DEEP, 'opacity=".45"'))
+    out.append(shape(TT(MUZZLE), [0.08] * 10, CREAM))
+    out.append(shape(TT(MUZZLE_LIT), [0.08, 0.05, -0.1, -0.1, 0.08], CREAM_LIT, 'opacity=".9"'))
+    out.append(shape(TT(MUZZLE_SHADE), [0.06, 0.08, 0.08, 0.06, -0.06, -0.08, -0.08, -0.06], CREAM_SHADE))
+    out.append(poly(TT(CHIN_SHADE), FUR_DEEP, 'opacity=".45"'))
     out.append(f'<rect x="-150" y="-160" width="300" height="270" fill="url(#facepaint{uid})"/>')
-    # loose fur strokes, lighter on the lit side
-    for (a, b, c, w, col, op) in [
-        ((-120, 30), (-100, 20), (-80, 26), 3, CREAM_LIT, .5),
-        ((-126, 54), (-104, 46), (-84, 54), 3, CREAM_LIT, .45),
-        ((-60, -70), (-40, -78), (-20, -76), 3, CREAM_LIT, .35),
-        ((100, 40), (86, 36), (70, 44), 3, FUR_DEEP, .6),
-        ((96, -20), (84, -10), (76, 4), 3, FUR_DEEP, .5),
+    # loose fur, light on the lit side and dark in the shadow
+    for p0, p1, p2, col, op in [
+        ((-118, 30), (-98, 20), (-78, 26), CREAM_LIT, .5),
+        ((-120, 54), (-100, 46), (-80, 54), CREAM_LIT, .45),
+        ((-56, -72), (-38, -80), (-20, -78), CREAM_LIT, .35),
+        ((118, 30), (98, 20), (78, 26), FUR_DEEP, .6),
+        ((120, 54), (100, 46), (80, 54), FUR_DEEP, .5),
     ]:
-        out.append(brush(a, b, c, w, col, op))
-    for x0, x1, w in [(-30, -26, 6), (-12, -10, 7), (6, 4, 5)]:
-        out.append(brush((x0, -94), (x0 + 2, -74), (x1, -52), w, STRIPE, 0.9, start=-0.2, end=0.6))
+        b(p0, p1, p2, 3, col, op)
+    for x, w, ln in [(-18, 6, 40), (0, 7, 46), (18, 6, 40)]:
+        b((x, -94), (x + 1, -94 + ln * 0.45), (x, -94 + ln), w, STRIPE, 0.9, start=-0.2, end=0.6)
     for y in (-6, 14):
-        out.append(brush((-138, y + 4), (-120, y), (-96, y + 6), 5, STRIPE, 0.75))
-        out.append(brush((126, y + 10), (110, y + 6), (92, y + 12), 5, FUR_DEEP, 0.6))
+        b((-130, y + 4), (-112, y), (-90, y + 6), 5, STRIPE, 0.75)
+        b((130, y + 4), (112, y), (90, y + 6), 5, FUR_DEEP, 0.6)
     out.append("</g>")
 
-    # silhouette: a thin even line, with heavier brush accents in the shadow
-    out.append(shape(HEAD, HEAD_BENDS, "none", f'stroke="{LINE}" stroke-width="2.6" stroke-linejoin="round"'))
-    for a, b, c, w in [
-        ((98, -46), (108, -24), (110, -8), 5), ((84, 60), (66, 76), (44, 88), 5),
-        ((44, 88), (16, 98), (-12, 100), 4.4), ((80, -146), (92, -100), (98, -46), 4),
+    # silhouette: a thin even line, heavier brush accents on the shadow side
+    out.append(shape(HEAD, HEAD_BENDS, "none", line))
+    for p0, p1, p2, w in [
+        ((104, -148), (104, -94), (100, -40), 4), ((100, -40), (108, -24), (110, -6), 5),
+        ((98, 64), (76, 78), (52, 88), 5), ((52, 88), (26, 98), (0, 100), 4.4),
     ]:
-        out.append(brush(a, b, c, w))
+        b(p0, p1, p2, w)
 
+    # eyes: same design both sides, the far one narrowed by the turn
     out.append(f"<style>{blink_css(lid)}</style>")
-    out.append(eye(-60, -8, 27, 18, mood, uid, "eyeN", look))
-    out.append(eye(38, -10, 20, 16, mood, uid, "eyeF", look - 1))
+    lx, _ = T((-EYE_X, 0))
+    rx, _ = T((EYE_X, 0))
+    out.append(eye(lx, EYE_Y, EYE_W * FAR_SCALE, EYE_H, mood, uid, "eyeN", look))
+    out.append(eye(rx, EYE_Y, EYE_W * NEAR_SCALE, EYE_H, mood, uid, "eyeF", look))
 
     # nose bridge and nose
-    out.append(brush((-6, -28), (-14, -4), (-24, 14), 2.4, LINE, 0.8))
-    out.append(poly(NOSE, "#8e4a48"))
-    out.append(poly([(-40, 16), (-24, 15), (-26, 22)], "#c07a6c"))
-    out.append(brush((-42, 16), (-22, 12), (-4, 14), 2.6))
-    out.append(brush((-21, 34), (-20, 42), (-22, 48), 2.2))
+    b((10, -32), (8, -10), (6, 10), 2.4, LINE, 0.7)
+    out.append(poly(TT(NOSE), "#8e4a48"))
+    out.append(poly(TT([(-16, 14), (-2, 13), (-4, 20)]), "#c07a6c"))
+    b((-18, 14), (0, 10), (18, 14), 2.6)
+    b((0, 30), (0, 38), (0, 44), 2.2)
 
     if mood == "hungry":
-        out.append(poly([(-40, 54), (-22, 48), (-2, 54), (-10, 72), (-30, 72)], "#4a1d1c"))
-        out.append(poly([(-30, 70), (-14, 70), (-20, 64)], "#a5504c"))
-        out.append(poly([(-34, 54), (-31, 61), (-28, 54)], "#efe2c8"))
-        out.append(poly([(-12, 54), (-9, 61), (-6, 54)], "#efe2c8"))
-        out.append(brush((-42, 54), (-22, 46), (0, 54), 2.6))
+        out.append(poly(TT([(-18, 52), (0, 46), (18, 52), (10, 70), (-10, 70)]), "#4a1d1c"))
+        out.append(poly(TT([(-8, 68), (8, 68), (0, 62)]), "#a5504c"))
+        out.append(poly(TT([(-13, 51), (-10, 58), (-7, 50)]), "#efe2c8"))
+        out.append(poly(TT([(7, 50), (10, 58), (13, 51)]), "#efe2c8"))
+        b((-20, 52), (0, 44), (20, 52), 2.6)
     elif mood == "happy":
-        out.append(brush((-48, 50), (-36, 58), (-22, 48), 2.6))
-        out.append(brush((-22, 48), (-8, 58), (6, 48), 2.6))
+        b((-26, 48), (-13, 57), (0, 46), 2.6)
+        b((0, 46), (13, 57), (26, 48), 2.6)
     elif mood == "bored":
-        out.append(brush((-46, 54), (-24, 52), (2, 54), 2.6))
+        b((-22, 53), (0, 51), (22, 53), 2.6)
     else:
-        out.append(brush((-46, 52), (-34, 57), (-22, 48), 2.6))
-        out.append(brush((-22, 48), (-10, 55), (2, 51), 2.4))
+        b((-24, 50), (-12, 55), (0, 46), 2.6)
+        b((0, 46), (12, 55), (24, 50), 2.4)
 
-    for (x0, y0), (x1, y1), (x2, y2) in [
-        ((-70, 44), (-130, 34), (-176, 40)),
-        ((-68, 52), (-128, 54), (-170, 68)),
-        ((18, 42), (70, 32), (120, 36)),
-        ((18, 50), (66, 52), (112, 64)),
-    ]:
-        out.append(brush((x0, y0), (x1, y1), (x2, y2), 1.8, "#efe2c8", 0.7))
+    for p0, p1, p2 in [((-50, 44), (-108, 34), (-158, 40)), ((-48, 52), (-106, 54), (-150, 68))]:
+        b(p0, p1, p2, 1.8, "#efe2c8", 0.7)
+        b((-p0[0], p0[1]), (-p1[0], p1[1]), (-p2[0], p2[1]), 1.8, "#efe2c8", 0.7)
     return "".join(out)
 
 
