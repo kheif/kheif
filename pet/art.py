@@ -722,14 +722,16 @@ def b_head(mood, uid):
     hd = head_shape()
     out = [b_ear(-1, mood), b_ear(1, mood)]
     out.append(f'<clipPath id="bhc{uid}"><path d="{hd}"/></clipPath>')
-    lower = smooth(TP((-40, 22), (-22, 14), (-6, 14), (8, 13), (26, 14), (46, 18), (60, 30),
-                      (54, 46), (30, 58), (0, 64), (-30, 58), (-46, 42)), 0.12)
+    # cream muzzle, symmetric about the mouth in front view; the head's
+    # turn narrows the far half the same way it narrows everything else
+    half = [(0, 12), (14, 12.5), (30, 15), (44, 22), (52, 34), (46, 48), (28, 58), (0, 63)]
+    lower = smooth(TP(*(half + [(-x, y) for x, y in reversed(half[1:-1])])), 0.12)
     body = f"""
         <path d="{hd}" fill="url(#b-head)"/>
         <g clip-path="url(#bhc{uid})">
           <path d="{smooth(TP((-120, -80), (-30, -70), (-22, -20), (-30, 30), (-60, 80), (-130, 80)), 0.12)}" fill="{B_FUR_DARK}" opacity=".45" filter="url(#haze)"/>
           <path d="{lower}" fill="{B_CREAM}" opacity=".95" filter="url(#crayon-soft)"/>
-          <path d="{smooth(TP((6, 16), (24, 16), (38, 24), (34, 36), (16, 40), (4, 32)), 0.15)}" fill="{B_CREAM_LIT}" opacity=".7" filter="url(#crayon-soft)"/>
+          <path d="{smooth(TP((0, 18), (16, 19), (28, 26), (24, 38), (0, 42), (-24, 38), (-28, 26), (-16, 19)), 0.15)}" fill="{B_CREAM_LIT}" opacity=".6" filter="url(#crayon-soft)"/>
           <g filter="url(#blurband)" opacity=".9">
             {stroke(T((-12, -63)), T((-11, -54)), T((-9, -42)), 7, B_STRIPE, 1, taper=(0.1, 1))}
             {stroke(T((2, -64)), T((3, -52)), T((3, -38)), 8, B_STRIPE, 1, taper=(0.1, 1))}
