@@ -524,6 +524,10 @@ def byte_defs():
       <stop offset="0" stop-color="{B_CREAM_LIT}"/>
       <stop offset="1" stop-color="{B_CREAM}"/>
     </linearGradient>
+    <linearGradient id="b-nose" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e48a88"/>
+      <stop offset="1" stop-color="#b9606a"/>
+    </linearGradient>
     <radialGradient id="b-iris" cx=".5" cy=".62" r=".6">
       <stop offset="0" stop-color="{B_EYE_LIT}"/>
       <stop offset=".75" stop-color="{B_EYE}"/>
@@ -648,31 +652,54 @@ def b_eye(side, mood, uid):
 
 def b_face(mood):
     out = []
-    n = T((0, 0))[0]
-    # tiny pink nose with a darker underside
-    out.append(f'<path d="M{n - 6} 12 Q{n + 1} 8.5 {n + 8} 12 Q{n + 6} 17 {n + 1} 20 Q{n - 4} 17 {n - 6} 12z" fill="{B_NOSE}"/>')
-    out.append(f'<path d="M{n - 1} 18 Q{n + 1} 20 {n + 3} 18" stroke="#9a4a4c" stroke-width="1.6" fill="none"/>')
-    out.append(f'<ellipse cx="{n + 2}" cy="11.8" rx="2.2" ry="1" fill="#f6c0b0"/>')
-    mouth = {
-        "hungry": f'<path d="M{n - 7} 27 Q{n + 1} 24 {n + 9} 27 Q{n + 5} 37 {n + 1} 37 Q{n - 3} 37 {n - 7} 27z" fill="#6a2422"/>'
-                  f'<path d="M{n - 2} 35 Q{n + 1} 32 {n + 4} 35z" fill="#d07070"/>',
-        "happy": "",
-        "bored": "",
-    }.get(mood, "")
-    out.append(mouth)
-    out.append(hair((n + 1, 20), (n + 1, 23), (n + 1, 25.5), 1.2, "#6a2c2a", .9))
-    if mood == "bored":
-        out.append(hair((n - 7, 28), (n + 1, 27), (n + 10, 28.5), 1.3, "#6a2c2a", .85))
-    elif mood == "hungry":
-        out.append(hair((n - 9, 27), (n + 1, 23), (n + 11, 27), 1.4, "#6a2c2a", .9))
+    # nose, mouth and chin are drawn straight on and then turned with the
+    # head, so the far half is a little narrower than the near half
+    def P(x, y):
+        return T((x, y))
+
+    def pd(*pts):
+        return " ".join(f"{c}{x:.1f} {y:.1f}" if c else f"{x:.1f} {y:.1f}" for c, (x, y) in pts)
+
+    # a small rounded inverted triangle: two soft upper corners, a round tip
+    nose = ("M{} C{} {} {} C{} {} {} C{} {} {} C{} {} {}z").format(
+        pd(("", P(-7, 11))),
+        pd(("", P(-7, 8))), pd(("", P(-2.5, 7.4))), pd(("", P(0, 8.4))),
+        pd(("", P(2.5, 7.4))), pd(("", P(7, 8))), pd(("", P(7, 11))),
+        pd(("", P(7, 14.2))), pd(("", P(2.2, 17.6))), pd(("", P(0, 18.4))),
+        pd(("", P(-2.2, 17.6))), pd(("", P(-7, 14.2))), pd(("", P(-7, 11))))
+    out.append(f'<path d="{nose}" fill="url(#b-nose)"/>')
+    hl = P(2.6, 10.2)
+    out.append(f'<ellipse cx="{hl[0]}" cy="{hl[1]}" rx="2.3" ry="1.2" fill="#f7c4b6" opacity=".9"/>')
+
+    # a tiny chin under the mouth, a shade warmer than the cream
+    chin = ("M{} Q{} {} Q{} {} Q{} {}z").format(
+        pd(("", P(-5.5, 27))), pd(("", P(-5, 33))), pd(("", P(0, 34))),
+        pd(("", P(5, 33))), pd(("", P(5.5, 27))), pd(("", P(0, 28.5))), pd(("", P(-5.5, 27))))
+    out.append(f'<path d="{chin}" fill="#eebc8e" opacity=".55"/>')
+
+    mouth_ink = "#6b2f33"
+    ln = f'stroke="{mouth_ink}" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"'
+    up = {"happy": 3.5, "fine": 1.5}.get(mood, 0)
+    if mood == "hungry":
+        o = ("M{} Q{} {} Q{} {} Q{} {}z").format(
+            pd(("", P(-7, 23.5))), pd(("", P(0, 21.5))), pd(("", P(7, 23.5))),
+            pd(("", P(6, 33))), pd(("", P(0, 34))), pd(("", P(-6, 33))), pd(("", P(-7, 23.5))))
+        out.append(f'<path d="{o}" fill="#6a2422"/>')
+        t = P(0, 31)
+        out.append(f'<ellipse cx="{t[0]}" cy="{t[1]}" rx="3.4" ry="2" fill="#d07070"/>')
+        out.append(f'<path d="M{pd(("", P(0, 18.4)))} L{pd(("", P(0, 21.5)))}" {ln}/>')
     else:
-        lift = 3 if mood == "happy" else 1
-        out.append(hair((n - 8, 27), (n - 3.5, 30.5), (n + 1, 25.5), 1.3, "#6a2c2a", .9))
-        out.append(hair((n + 1, 25.5), (n + 6, 31), (n + 12, 26 - lift), 1.4, "#6a2c2a", .9))
-    # freckle dots on the muzzle, as in the references
-    for dx, dy in [(13, 27), (19, 30.5), (13.5, 34), (-13, 27), (-19, 30.5), (-13.5, 34)]:
-        p = T((dx, dy))
-        out.append(f'<circle cx="{p[0]}" cy="{p[1]}" r="1.4" fill="{B_FUR_DARK}" opacity=".75"/>')
+        # philtrum, then a "w" whose ends turn up
+        out.append(f'<path d="M{pd(("", P(0, 18.4)))} L{pd(("", P(0, 22)))}" {ln}/>')
+        for sd in (-1, 1):
+            out.append(f'<path d="M{pd(("", P(0, 22)))} Q{pd(("", P(sd * 1.4, 25.2)))} {pd(("", P(sd * 5.4, 25.2)))} '
+                       f'Q{pd(("", P(sd * 9.4, 25.2)))} {pd(("", P(sd * 11.5, 23.2 - up * (0.7 if sd > 0 else 0.4))))}" {ln}/>')
+
+    # freckles: a little triangle of dots on each whisker pad
+    for sd in (-1, 1):
+        for dx, dy in [(16.5, 29.5), (22, 28.5), (20, 33.5)]:
+            p = P(sd * dx, dy)
+            out.append(f'<circle cx="{p[0]}" cy="{p[1]}" r="1.35" fill="#d67a3c"/>')
     # whiskers: long, thin, slightly curved; each one different
     for (sx_, sy), ln, ang, sag, op in [((22, 26), 88, -6, 6, .85), ((24, 30), 104, 4, 12, .8),
                                         ((22, 34), 86, 13, 14, .65), ((18, 37), 62, 24, 8, .5)]:
