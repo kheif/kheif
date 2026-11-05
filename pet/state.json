@@ -1,17 +1,21 @@
 {
-  "food": 7,
-  "love": 32,
+  "food": 6,
+  "love": 31,
   "energy": 100,
-  "updated": 1793864507,
+  "updated": 1793866316,
   "counts": {
     "feed": 0,
     "play": 0,
     "pet": 0,
-    "diary": 0
+    "diary": 1
   },
   "friends": [],
   "visitors": [],
   "diary": [
+    {
+      "at": 1793866316,
+      "text": "nobody came. i stared at the bowl until it got dark."
+    },
     {
       "at": 1793793842,
       "text": "moved in today. the rug is acceptable."

@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/header.svg" alt="hi, i'm mehmet" width="100%">
+  <picture>
+    <source media="(max-width: 640px)" srcset="assets/header-narrow.svg">
+    <img src="assets/header.svg" alt="hi, i'm mehmet. a tea glass on the window sill, byte the cat lying behind it." width="100%">
+  </picture>
 </p>
 
 <p align="center">
@@ -8,7 +11,10 @@
 </p>
 
 <p align="center">
-  <img src="assets/byte.svg" alt="byte the cat, current status" width="100%">
+  <picture>
+    <source media="(max-width: 640px)" srcset="assets/byte-narrow.svg">
+    <img src="assets/byte.svg" alt="byte the cat lying on the sill, with today's food, love and nap levels" width="100%">
+  </picture>
 </p>
 
 <p align="center">
@@ -30,6 +36,7 @@
 
 <!-- DIARY:START -->
 ```text
+nov 05  nobody came. i stared at the bowl until it got dark.
 nov 04  moved in today. the rug is acceptable.
 ```
 <!-- DIARY:END -->

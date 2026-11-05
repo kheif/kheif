@@ -18,11 +18,12 @@ import time
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cat as C  # noqa: E402
+import art as A  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE = os.path.join(ROOT, "pet", "state.json")
 SVG = os.path.join(ROOT, "assets", "byte.svg")
+SVG_NARROW = os.path.join(ROOT, "assets", "byte-narrow.svg")
 README = os.path.join(ROOT, "README.md")
 REPLY = os.path.join(ROOT, "pet", "reply.md")
 
@@ -126,36 +127,30 @@ def write_diary(state, kind, user=None):
 # --------------------------------------------------------------------- drawing
 
 
-def props(m):
-    """Foreground objects that depend on the mood, out of focus."""
+def props(m, x, y, s=1.0):
+    """Small things on the sill that depend on the mood."""
     if m == "hungry":
-        return C.fish_bones(120, 280)
+        return A.dish(x, y, s, bones=True)
     if m == "bored":
-        return C.yarn(470, 300)
-    if m == "asleep":
-        return "".join(
-            f'<text class="rise" style="animation-delay:{i * 1.3:.1f}s" x="{x}" y="{y}" font-family="{C.SERIF}" '
-            f'font-style="italic" font-size="{size}" fill="{C.TEXT}">z</text>'
-            for i, (x, y, size) in enumerate([(392, 100, 26), (410, 76, 20), (424, 58, 15)])
-        )
+        return A.yarn(x, y, s)
     return ""
 
 
-def meter(y, label, value, color):
-    w = 220
-    fill = max(8, round(w * value / 100))
+def meter(x, y, label, value, color, size=16, w=220):
+    """A painted bar: a dark groove in the wall and a gouache fill."""
+    fill = max(6, round(w * value / 100))
+    lx = x + size * 3.6
+    h = max(8, size * 0.55)
     return f"""
-    <text x="0" y="{y + 12}" font-family="{C.SERIF}" font-style="italic" font-size="16" fill="{C.MUTED}">{label}</text>
-    <rect x="58" y="{y + 3}" width="{w}" height="8" rx="4" fill="#000" opacity=".35"/>
-    <rect x="58" y="{y + 3}" width="{fill}" height="8" rx="4" fill="{color}"/>
-    <text x="{58 + w + 14}" y="{y + 12}" font-family="{C.SERIF}" font-size="14" fill="{C.MUTED}">{value}</text>"""
+    <text x="{x}" y="{y + h}" font-family="{A.SERIF}" font-style="italic" font-size="{size}" fill="{A.TEXT_SOFT}">{label}</text>
+    <rect x="{lx}" y="{y + 1}" width="{w}" height="{h}" rx="{h / 2}" fill="#1e130e" opacity=".75"/>
+    <rect x="{lx}" y="{y}" width="{fill}" height="{h}" rx="{h / 2}" fill="{color}"/>
+    <text x="{lx + w + 16}" y="{y + h}" font-family="{A.SERIF}" font-size="{size - 1}" fill="{A.TEXT}">{value}</text>"""
 
 
-def render(state):
-    m = mood(state)
+def readout(state, m, x, y, k=1.0):
+    """Name, mood and the three meters, laid out from (x, y)."""
     c = state["counts"]
-    W, H = 900, 340
-
     if state["visitors"]:
         v = state["visitors"][0]
         when = datetime.fromtimestamp(v["at"], timezone.utc).strftime("%b %d").lower()
@@ -167,34 +162,74 @@ def render(state):
         f'{c["feed"]} fish, {c["play"]} yarn, {c["pet"]} pets, '
         f'{friends} {"friend" if friends == 1 else "friends"} so far'
     )
-    front = m in ("hungry", "bored")
+    f = lambda v: round(v * k, 1)  # noqa: E731
+    return f"""
+    <g transform="translate({x} {y})">
+      <text x="0" y="{f(42)}" font-family="{A.SERIF}" font-style="italic" font-size="{f(46)}" fill="{A.TEXT}">Byte</text>
+      <text x="{f(2)}" y="{f(72)}" font-family="{A.SERIF}" font-style="italic" font-size="{f(18)}" fill="{A.TEXT_SOFT}">{html.escape(STATUS[m])}</text>
+      {meter(f(2), f(94), "food", state["food"], "#d9924f", f(16), f(210))}
+      {meter(f(2), f(120), "love", state["love"], "#c4606a", f(16), f(210))}
+      {meter(f(2), f(146), "nap", state["energy"], "#7f93bb", f(16), f(210))}
+      <text x="{f(2)}" y="{f(186)}" font-family="{A.SERIF}" font-size="{f(15)}" fill="{A.TEXT_FAINT}">{last}</text>
+      <text x="{f(2)}" y="{f(207)}" font-family="{A.SERIF}" font-size="{f(15)}" fill="{A.TEXT_FAINT}">{tally}</text>
+    </g>"""
 
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="byte the cat is {html.escape(STATUS[m])}">
+
+def snooze(x, y, k=1.0):
+    return "".join(
+        f'<text class="rise" style="animation-delay:{i * 1.4:.1f}s" x="{x + dx * k}" y="{y + dy * k}" font-family="{A.SERIF}" '
+        f'font-style="italic" font-size="{size * k}" fill="{A.TEXT_SOFT}">z</text>'
+        for i, (dx, dy, size) in enumerate([(0, 0, 22), (16, -22, 17), (28, -40, 13)])
+    )
+
+
+def frame(W, H, m, body):
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="byte the cat, lying on the sill: {html.escape(STATUS[m])}">
   <defs>
-    {C.defs()}
-    <clipPath id="card"><rect width="{W}" height="{H}" rx="18"/></clipPath>
+    {A.defs()}
+    <clipPath id="card"><rect width="{W}" height="{H}" rx="16"/></clipPath>
   </defs>
-  <style>{C.CSS}</style>
-  <g clip-path="url(#card)">
-    {C.backdrop(W, H)}
-    {"" if front else props(m)}
-    {C.cat(m, x=270, y=186, scale=1.08)}
-    {props(m) if front else ""}
-
-    <g transform="translate(540 0)">
-      <text x="0" y="96" font-family="{C.SERIF}" font-style="italic" font-size="46" fill="{C.TEXT}">Byte</text>
-      <text x="0" y="126" font-family="{C.SERIF}" font-style="italic" font-size="17" fill="{C.MUTED}">{html.escape(STATUS[m])}</text>
-      {meter(156, "food", state["food"], "#c98a4e")}
-      {meter(184, "love", state["love"], "#b4545c")}
-      {meter(212, "nap", state["energy"], "#7286a8")}
-      <text x="0" y="262" font-family="{C.SERIF}" font-size="14" fill="{C.MUTED}">{last}</text>
-      <text x="0" y="284" font-family="{C.SERIF}" font-size="14" fill="{C.MUTED}">{tally}</text>
-    </g>
-    {C.overlay(W, H)}
-  </g>
-  <rect x="1" y="1" width="{W - 2}" height="{H - 2}" rx="18" fill="none" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+  <style>{A.CSS}</style>
+  <g clip-path="url(#card)"><rect width="{W}" height="{H}" fill="{A.WOOD_DARK}"/>{body}</g>
+  <rect x="1" y="1" width="{W - 2}" height="{H - 2}" rx="16" fill="none" stroke="#1c100a" stroke-opacity=".6" stroke-width="2"/>
 </svg>
 """
+
+
+def render(state):
+    """Desktop: a closer look at the same sill, Byte on the left."""
+    m = mood(state)
+    W, H = 900, 340
+    top, front = 240, 308
+    light = A.window_light(30, 34, pane_w=132, pane_h=90, gap=13, skew=0.24, slope=-0.06)
+    body = f"""
+    {A.wall(W, top, patches=light)}
+    <rect x="{W - 34}" y="-10" width="44" height="{top + 10}" fill="#2a1c18"/>
+    {A.stroke((W - 34, 0), (W - 33, top / 2), (W - 34, top), 2.4, A.WOOD_EDGE, .6)}
+    {A.sill(W, top, front, H, sun_from=0.7, grain_seed=5)}
+    {A.cast_shadow(262, 294)}
+    {props(m, 440, 298)}
+    {A.byte(m, 262, 294)}
+    {snooze(390, 92) if m == "asleep" else ""}
+    {readout(state, m, 540, 22)}"""
+    return frame(W, H, m, body)
+
+
+def render_narrow(state):
+    """Phone: the readout on top in larger type, Byte underneath."""
+    m = mood(state)
+    W, H = 600, 700
+    top, front = 590, 652
+    light = A.window_light(40, 404, pane_w=120, pane_h=74, gap=12, skew=0.24, slope=-0.06)
+    body = f"""
+    {A.wall(W, top, patches=light)}
+    {A.sill(W, top, front, H, sun_from=0.7, grain_seed=5)}
+    {A.cast_shadow(300, 646, 1.05)}
+    {props(m, 500, 650, 1.1)}
+    {A.byte(m, 300, 646, 1.05)}
+    {snooze(430, 430, 1.1) if m == "asleep" else ""}
+    {readout(state, m, 44, 52, 1.45)}"""
+    return frame(W, H, m, body)
 
 
 # ---------------------------------------------------------------------- readme
@@ -289,6 +324,8 @@ def main():
     save(state)
     with open(SVG, "w", encoding="utf-8") as f:
         f.write(render(state))
+    with open(SVG_NARROW, "w", encoding="utf-8") as f:
+        f.write(render_narrow(state))
     update_readme(state)
     print(f"ok: {action} -> {mood(state)}")
 
