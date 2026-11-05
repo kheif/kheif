@@ -49,6 +49,8 @@ TEXT_FAINT = "#c7b193"
 SERIF = "Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif"
 
 
+LIGHT_EDGE = "#ffd9a0"
+
 # ------------------------------------------------------------------ geometry
 
 
@@ -117,7 +119,7 @@ def path(d, fill="none", extra=""):
 
 
 def defs():
-    return f"""
+    return byte_defs() + f"""
     <filter id="gouache" x="-5%" y="-5%" width="110%" height="110%">
       <feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="3" result="n"/>
       <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
@@ -412,122 +414,122 @@ def tea(x, y, s=1.0, steam=True):
 
 # ------------------------------------------------------------------ Byte
 
-# Byte lies loaf style on the sill in three quarter view: head at the
-# front right, body running back and to the left behind it, paws tucked.
-# Local units, ground at y = 0. The sun comes from the right.
+# ------------------------------------------------------------------ Byte
+#
+# Byte follows the look of soft, textured cat illustrations:
+#   * no closed outline: an edge is where one colour meets another, and
+#     that edge is grainy, like crayon on paper
+#   * a thin, broken dark line only where one form overlaps another,
+#     on the underside of that overlap (chin over chest, paw, ear back)
+#   * big simple shapes: a wide cheeked head, a bean shaped body
+#   * colour runs in soft gradients and darkens towards the extremities;
+#     cream on the muzzle and chest fades into orange through the grain
+#   * stripes are broad soft bands, not ink strokes
+#   * big round eyes with a dark pupil, a tiny pink nose, freckle dots,
+#     long thin whiskers
+#
+# He lies loaf style on the sill in three quarter view: head at the
+# front right, body running back and to the left, paws tucked. The sun
+# comes from the window on the right. Local units, ground at y = 0.
+
+B_FUR = "#e48a46"
+B_FUR_LIT = "#f6ad66"
+B_FUR_DARK = "#b8592c"
+B_DEEP = "#7a3220"
+B_STRIPE = "#bd5c2b"
+B_CREAM = "#f8dcb4"
+B_CREAM_LIT = "#fff1dc"
+B_PINK = "#eda08e"
+B_NOSE = "#d8787a"
+B_LINE = "#2c140d"
+B_WHISKER = "#f7dfb0"
+B_EYE = "#e2b544"
+B_EYE_LIT = "#f6dc80"
 
 BODY = (
     "M100 -6 "
     "L-150 -6 "
-    "C-182 -8 -192 -56 -170 -90 "                   # rump
-    "C-146 -130 -76 -162 10 -156 "                  # one soft back arc
-    "C56 -152 108 -116 116 -66 "                    # behind the head down to the chest
+    "C-182 -8 -192 -56 -170 -90 "
+    "C-146 -130 -76 -162 10 -156 "
+    "C56 -152 108 -116 116 -66 "
     "C120 -36 114 -12 100 -6z"
 )
-
-HAUNCH = "M-98 -6 C-94 -56 -124 -94 -166 -82"
-HAUNCH_SHADE = "M-170 -90 C-192 -56 -182 -8 -150 -6 L-104 -6 C-98 -44 -118 -86 -164 -86z"
-BELLY_SHADE = "M-150 -6 L100 -6 C112 -10 118 -20 118 -28 C40 -22 -60 -22 -170 -30z"
-
-# the tail leaves the hip, wraps round the rump and curls along the front
 TAIL_A = ((-146, -30), (-182, -30), (-194, -2), (-150, 2))
 TAIL_B = ((-150, 2), (-106, 5), (-54, 6), (-20, -12))
+HEAD_X, HEAD_Y, HEAD_S = 44, -104, 1.18
 
-HEAD_X, HEAD_Y, HEAD_S = 50, -96, 1.2
+# head turned three quarters to the viewer's left: the right side is
+# the near one, wider and lit; the left side narrower
+TURN_C, SCALE_L, SCALE_R = -10, 0.78, 1.0
 
-
-def tail():
-    pts, ws = [], []
-    for seg, w0, w1, n in [(TAIL_A, 27, 24, 12), (TAIL_B, 24, 15, 18)]:
-        for i in range(n + (seg is TAIL_B)):
-            t = i / n
-            pts.append(_cubic(*seg, t))
-            ws.append(w0 * (1 - t) + w1 * t)
-    for k, f in zip(range(1, 6), (0.3, 0.55, 0.72, 0.85, 0.94)):
-        ws[-k] *= f
-    d = _ribbon(pts, ws)
-    # rings sit across the tail, following its direction
-    rings = []
-    for idx in (6, 13, 19, 25):
-        (x, y), (x2, y2) = pts[idx], pts[idx + 1]
-        ang = math.atan2(y2 - y, x2 - x) + math.pi / 2
-        hw = ws[idx] / 2
-        c, s_ = math.cos(ang) * hw, math.sin(ang) * hw
-        rings.append(stroke((x - c, y - s_), (x + 3, y), (x + c, y + s_), 5.5, STRIPE, .7, taper=(0.6, 0.6)))
-    tip = pts[-3]
-    return f"""
-    <mask id="tailmask" maskUnits="userSpaceOnUse" x="-260" y="-200" width="420" height="240">
-      <rect x="-260" y="-200" width="420" height="240" fill="#fff"/>
-      <path d="{BODY}" fill="#000"/>
-      <rect x="-150" y="-12" width="200" height="30" fill="#fff"/>
-      <path d="M-60 -12 L10 -12 L10 -30 L-60 -30z" fill="#fff"/>
-    </mask>
-    <g class="tail" mask="url(#tailmask)">
-      <g filter="url(#gouache)"><path d="{d}" fill="{FUR}"/></g>
-      {"".join(rings)}
-      {stroke((tip[0] - 2, tip[1] + 2), (tip[0] + 4, tip[1] - 2), pts[-1], 6, FUR_DEEP, .75)}
-      {stroke(pts[14], pts[20], pts[26], 2.4, FUR_LIT, .8)}
-      <path d="{d}" fill="none" stroke="{INK}" stroke-width="1.7" opacity=".8"/>
-    </g>"""
-
-
-def body_stripes():
-    """Tabby bands that wrap around the barrel, following its volume."""
-    out = []
-    for x, y, dx, ln, w in [
-        (-14, -156, -4, 48, 12), (-48, -150, -8, 52, 12), (-82, -138, -12, 50, 11),
-        (-114, -122, -14, 44, 10), (-142, -102, -12, 36, 9),
-    ]:
-        out.append(stroke((x, y + 2), (x + dx * 0.4 - 6, y + ln * 0.55), (x + dx, y + ln), w, STRIPE, .55, taper=(0.4, 1)))
-    for x, y in [(-150, -66), (-140, -44)]:
-        out.append(stroke((x, y), (x + 14, y - 8), (x + 30, y - 4), 7, STRIPE, .5))
-    return "".join(out)
-
-
-def paw():
-    """Tip of the near front paw, peeking from under the chest."""
-    return f"""
-    <g filter="url(#gouache)">
-      <path d="M50 -4 C50 -20 66 -26 84 -24 C100 -22 110 -14 108 -4z" fill="{CREAM_MID}"/>
-      <path d="M58 -14 C66 -22 84 -24 98 -18 C92 -20 70 -20 58 -14z" fill="{CREAM}" opacity=".9"/>
-      <path d="M50 -4 C52 -10 60 -12 70 -10 L66 -4z" fill="{CREAM_SHADE}" opacity=".8"/>
-    </g>
-    <path d="M50 -4 C50 -20 66 -26 84 -24 C100 -22 110 -14 108 -4" stroke="{INK}" stroke-width="1.7" fill="none" opacity=".85"/>
-    {stroke((74, -5), (75, -11), (76, -16), 1.6, INK, .7)}
-    {stroke((88, -5), (89, -11), (90, -16), 1.6, INK, .7)}"""
-
-
-def chest():
-    """Cream bib under the chin, spread along the fur direction."""
-    return f"""
-    <g filter="url(#gouache)">
-      <path d="M30 -78 C22 -54 34 -34 40 -24 C48 -12 60 -14 64 -22 C76 -14 92 -16 100 -24 C110 -20 120 -28 122 -40
-               C126 -60 118 -84 100 -98z" fill="{CREAM_MID}"/>
-      <path d="M86 -96 C106 -84 120 -62 120 -42 C112 -36 104 -40 98 -36 C104 -56 98 -76 86 -96z" fill="{CREAM}" opacity=".85"/>
-      <path d="M30 -78 C22 -54 34 -34 40 -24 C44 -18 50 -16 54 -18 C44 -36 40 -56 46 -84z" fill="{CREAM_SHADE}" opacity=".7"/>
-    </g>
-    {stroke((46, -40), (52, -30), (50, -22), 2, CREAM_SHADE, .8)}
-    {stroke((70, -44), (76, -32), (74, -22), 2, CREAM_SHADE, .7)}
-    {stroke((96, -52), (102, -40), (100, -30), 2, "#fff6e4", .8)}"""
-
-
-# head, built straight on and symmetric, then turned three quarters to
-# the viewer's left: the right cheek is the near one and catches the
-# window light, the left one is narrower and falls into shadow.
-TURN_C, SCALE_L, SCALE_R = -12, 0.74, 1.0
-
-SHADOW_RED = "#8a4030"     # the far cheek, red brown
-LIGHT_EDGE = "#ffd9a0"     # where the low sun touches an edge
-
-# Byte's expressions. Each eye can be: half (heavy lidded), slit (one
-# eye just cracked open), wide, content (squeezed shut, arched), shut.
 EXPR = {
-    "fine":   dict(eyes={-1: ("half", .55), 1: ("half", .52)}, look=2, turned_ear=-1, brow=False, tilt=0, drop=0),
-    "happy":  dict(eyes={-1: ("content", 0), 1: ("slit", .8)}, look=3.5, turned_ear=-1, brow=True, tilt=5, drop=8),
-    "bored":  dict(eyes={-1: ("half", .7), 1: ("half", .68)}, look=-4, turned_ear=-1, brow=False, tilt=3, drop=4),
-    "hungry": dict(eyes={-1: ("wide", .15), 1: ("wide", .12)}, look=2.5, turned_ear=0, brow=True, tilt=-5, drop=-6),
+    "fine":   dict(eyes={-1: ("open", .5), 1: ("open", .46)}, look=2, turned_ear=-1, brow=False, tilt=0, drop=0),
+    "happy":  dict(eyes={-1: ("content", 0), 1: ("open", .62)}, look=3, turned_ear=-1, brow=True, tilt=5, drop=8),
+    "bored":  dict(eyes={-1: ("open", .64), 1: ("open", .6)}, look=-4, turned_ear=-1, brow=False, tilt=3, drop=4),
+    "hungry": dict(eyes={-1: ("open", .08), 1: ("open", .05)}, look=2, turned_ear=0, brow=True, tilt=-5, drop=-6),
     "asleep": dict(eyes={-1: ("shut", 0), 1: ("shut", 0)}, look=0, turned_ear=0, brow=False, tilt=8, drop=12),
 }
+
+
+def byte_defs():
+    """Filters and gradients for Byte's soft, grainy painting."""
+    return f"""
+    <filter id="crayon" x="-10%" y="-10%" width="120%" height="120%">
+      <feMorphology in="SourceGraphic" operator="dilate" radius="1" result="wide"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.1" result="soft"/>
+      <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="21" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 0" result="na"/>
+      <feComposite in="soft" in2="na" operator="arithmetic" k2="3" k3="1" k4="-1.95" result="mask"/>
+      <feComposite in="wide" in2="mask" operator="in"/>
+    </filter>
+    <filter id="crayon-soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feMorphology in="SourceGraphic" operator="dilate" radius="2" result="wide"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="soft"/>
+      <feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="33" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 0" result="na"/>
+      <feComposite in="soft" in2="na" operator="arithmetic" k2="1.9" k3="1.1" k4="-1.45" result="mask"/>
+      <feComposite in="wide" in2="mask" operator="in"/>
+    </filter>
+    <filter id="speckle" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".95" numOctaves="1" seed="5" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 .36  0 0 0 0 .13  0 0 0 0 .07  6 0 0 0 -3.4"/>
+    </filter>
+    <filter id="speckle-light" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="13" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 .9  0 0 0 0 .74  6 0 0 0 -3.5"/>
+    </filter>
+    <filter id="line" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="1" seed="2" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2.4 0 0 0 -.7" result="m"/>
+      <feComposite in="SourceGraphic" in2="m" operator="in"/>
+    </filter>
+    <filter id="blurband" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.6"/></filter>
+    <linearGradient id="b-body" x1=".85" y1="0" x2=".1" y2="1">
+      <stop offset="0" stop-color="{B_FUR_LIT}"/>
+      <stop offset=".45" stop-color="{B_FUR}"/>
+      <stop offset="1" stop-color="{B_FUR_DARK}"/>
+    </linearGradient>
+    <linearGradient id="b-tail" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="{B_FUR_DARK}"/>
+      <stop offset=".45" stop-color="{B_FUR}"/>
+      <stop offset=".85" stop-color="{B_FUR_DARK}"/>
+      <stop offset="1" stop-color="{B_DEEP}"/>
+    </linearGradient>
+    <radialGradient id="b-head" cx=".66" cy=".3" r=".8">
+      <stop offset="0" stop-color="{B_FUR_LIT}"/>
+      <stop offset=".55" stop-color="{B_FUR}"/>
+      <stop offset="1" stop-color="{B_FUR_DARK}"/>
+    </radialGradient>
+    <linearGradient id="b-cream" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="{B_CREAM_LIT}"/>
+      <stop offset="1" stop-color="{B_CREAM}"/>
+    </linearGradient>
+    <radialGradient id="b-iris" cx=".5" cy=".62" r=".6">
+      <stop offset="0" stop-color="{B_EYE_LIT}"/>
+      <stop offset=".75" stop-color="{B_EYE}"/>
+      <stop offset="1" stop-color="#b9862a"/>
+    </radialGradient>
+    """
 
 
 def T(p):
@@ -539,291 +541,274 @@ def TP(*pts):
     return [T(p) for p in pts]
 
 
-def head_outline():
-    """Soft head: rounded crown, cheek fluff in a few tufts, small chin."""
-    crown = (0, -60)
-    right = [
-        ((30, -60), (56, -50), (66, -30)),    # crown to cheek top
-        ((74, -16), (80, -2), (80, 6)),       # upper cheek
-        ((86, 12), (92, 16), (90, 19)),       # tuft 1
-        ((84, 21), (86, 27), (87, 31)),
-        ((79, 35), (77, 38), (70, 40)),       # tuft 2
-        ((58, 52), (30, 59), (0, 59)),        # jaw to chin
-    ]
-    d = [f"M{T(crown)[0]} {crown[1]}"]
-    for c1, c2, e in right:
-        a, b, c = T(c1), T(c2), T(e)
-        d.append(f"C{a[0]} {a[1]} {b[0]} {b[1]} {c[0]} {c[1]}")
-    pts = [crown] + [seg[2] for seg in right]
-    for i in range(len(right) - 1, -1, -1):
-        c1, c2, e = right[i]
-        start = pts[i]
-        m = lambda p: (-p[0], p[1])  # noqa: E731
-        a, b, c = T(m(c2)), T(m(c1)), T(m(start))
-        d.append(f"C{a[0]} {a[1]} {b[0]} {b[1]} {c[0]} {c[1]}")
-    return " ".join(d) + "z"
-
-
-def ear(side, mood, uid):
-    """side 1 is the near ear, lit by the window; side -1 the far one.
-
-    The turned ear swings outward towards a sound and shows more of its
-    back, so it gets narrower and darker.
-    """
-    e = EXPR[mood]
-    m = (lambda p: (side * p[0], p[1]))
-    base_in, tip, base_out = m((20, -56)), m((50, -94)), m((66, -32))
-    pts = [T(base_in), T(m((45, -89))), T(m((54, -89))), T(base_out)]
-    d = (f"M{pts[0][0]} {pts[0][1]} Q{T(m((30, -76)))[0]} -76 {pts[1][0]} {pts[1][1]} "
-         f"Q{T(tip)[0]} {tip[1] - 4} {pts[2][0]} {pts[2][1]} "
-         f"Q{T(m((64, -64)))[0]} -64 {pts[3][0]} {pts[3][1]}z")
-    inner = (f"M{T(m((27, -56)))[0]} -56 Q{T(m((34, -74)))[0]} -74 {T(m((48, -85)))[0]} -85 "
-             f"Q{T(m((56, -66)))[0]} -66 {T(m((57, -42)))[0]} -42z")
-    near = side > 0
-    turned = e["turned_ear"] == side
-    pivot = T(m((44, -46)))
-    if turned:
-        xf = f"rotate({-26 * side} {pivot[0]} {pivot[1]}) translate({pivot[0]} 0) scale(.72 1) translate({-pivot[0]} 0)"
-    else:
-        xf = f"rotate({4 * side if near else 0} {pivot[0]} {pivot[1]})"
-    if near:
-        body = f"""
-        <g filter="url(#gouache)"><path d="{d}" fill="{FUR_LIT}"/><path d="{inner}" fill="#eaa58c"/></g>
-        <path d="{inner}" fill="#ffc9a8" opacity=".45" filter="url(#softedge)"/>
-        {stroke(T(m((40, -48))), T(m((43, -64))), T(m((45, -78))), 2, CREAM, .8)}
-        {stroke(T(m((48, -48))), T(m((50, -62))), T(m((49, -74))), 1.6, CREAM, .7)}
-        {stroke(T(m((54, -86))), T(m((62, -60))), T(m((66, -34))), 2.6, LIGHT_EDGE, .9, taper=(0.6, 1))}
-        <path d="{d}" stroke="{INK}" stroke-width="1.3" fill="none" opacity=".8"/>"""
-    else:
-        body = f"""
-        <g filter="url(#gouache)"><path d="{d}" fill="{FUR_SHADE}"/><path d="{inner}" fill="{EAR}" opacity="{.35 if turned else .8}"/></g>
-        {stroke(T(m((40, -48))), T(m((42, -62))), T(m((44, -75))), 1.8, CREAM, .4)}
-        <path d="{d}" stroke="{INK}" stroke-width="1.7" fill="none" opacity=".85"/>
-        {stroke(T(m((48, -90))), T(m((58, -64))), T(m((66, -34))), 2.8, INK, .55)}"""
-    listen = ' class="ear-listen"' if turned else ""
-    return f'<g transform="{xf}"><g{listen}>{body}</g></g>'
-
-
-def eye(side, mood, uid):
-    """One eye in its own little coordinate system, so the lid can slide
-    down without changing shape. side 1 is the near (lit) eye."""
-    e = EXPR[mood]
-    kind, lid = e["eyes"][side]
-    cx, cy = T((side * 30, -8))
-    sx = SCALE_L if side < 0 else SCALE_R
-    w, h = 17, 11.5
-    near = side > 0
-    g = f'transform="translate({cx} {cy}) rotate({side * 4}) scale({sx * side} 1)"'
-    ink = 1 if near else 0.85
-
-    if kind == "content":
-        return f"""
-      <g {g}>
-        {stroke((-w * 0.9, 3), (0, -8), (w * 0.9, 1), 3.2 * ink, INK)}
-        {stroke((-w * 0.55, 6), (0, 4.5), (w * 0.5, 5), 1, INK, .3)}
-      </g>"""
-    if kind == "shut":
-        return f"""
-      <g {g}>
-        {stroke((-w, -1), (0, 7), (w, -2), 3 * ink, INK)}
-        {stroke((-w * 0.5, 7), (0, 10), (w * 0.6, 6), 1, INK, .3)}
-      </g>"""
-
-    # Only the opening between the lid line and the lower lid is drawn;
-    # the lid itself is the face's own fur, so it shares its light.
-    look = e["look"] * side
-    pupil_r = 3.4 if kind == "wide" else (2.3 if kind == "slit" else 2.6)
-    top_y = -h * 1.45 * (1 - lid) + h * 0.55 * lid     # lid curve control
-    lower = f"Q{w * 0.15} {h * 1.05} {-w} 0"
-    opening = f"M{-w} 0 Q{-w * 0.1} {top_y:.1f} {w} {-h * 0.2} {lower}z"
-    name = f"eye{'N' if near else 'F'}{uid}"
-    fold = stroke((-w * 0.8, -h * 0.95), (-w * 0.1, -h * 1.8), (w * 0.85, -h * 1.05), 1.3,
-                  FUR_DEEP if near else INK, .45 if near else .35)
-    lid_light = (stroke((-w * 0.55, top_y * 0.5 - 4), (0, top_y * 0.62 - 6), (w * 0.7, top_y * 0.45 - 5), 3.2, LIGHT_EDGE, .75)
-                 if near else "")
-    return f"""
-      <g {g}>
-        {fold}
-        {lid_light}
-        <g class="blink">
-          <clipPath id="{name}"><path d="{opening}"/></clipPath>
-          <path d="{opening}" fill="url(#iris)"/>
-          <g clip-path="url(#{name})">
-            <ellipse cx="{look}" cy="2.5" rx="{pupil_r}" ry="{pupil_r * 2.1}" fill="#24130c"/>
-            <circle cx="{look + 2.6 * side}" cy="{0.5 if kind == 'slit' else -2.5}" r="1.5" fill="#fffaf0"/>
-            <path d="M{-w} {top_y * 0.5} Q0 {top_y * 0.5 + 3} {w} {top_y * 0.5 - 2}" stroke="#000" stroke-opacity=".28" stroke-width="5" fill="none"/>
-          </g>
-          {stroke((-w - 3, 0.5), (-w * 0.1, top_y + 1.5), (w + 3, -h * 0.25), 3.4 * ink, INK, taper=(0.7, 0.35))}
-        </g>
-        {stroke((-w * 0.95, 0.8), (w * 0.15, h * 1.05), (w, -h * 0.15), 1.4, INK, .7, taper=(1, 0.6))}
-      </g>"""
-
-
-def face(mood, uid):
-    """Muzzle, nose, mouth and whiskers. Nothing here is mirrored: the
-    near side is wider and lit, the far side short and in shadow."""
-    out = []
-    # one matte cream field that grows out of the cheeks: tufted where it
-    # meets the orange fur, wider on the near side, no separate pads
-    edge = [(-10, 13), (-20, 17), (-28, 24), (-34, 31), (-27, 34), (-26, 43), (-14, 50), (0, 55),
-            (18, 54), (32, 50), (38, 44), (46, 40), (40, 34), (46, 27), (36, 22), (26, 16), (14, 13), (6, 12)]
-    q = TP(*edge)
-    parts = [f"M{q[0][0]} {q[0][1]}"]
-    for i in range(len(q)):
+def smooth(points, k=0.18, closed=True):
+    """A soft path through points: every edge bows a little outward."""
+    q = points
+    d = [f"M{q[0][0]:.1f} {q[0][1]:.1f}"]
+    n = len(q) if closed else len(q) - 1
+    for i in range(n):
         p0, p1 = q[i], q[(i + 1) % len(q)]
-        # bow every edge a little outward, more on the long smooth ones
         mx, my = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
         dx, dy = p1[0] - p0[0], p1[1] - p0[1]
-        k = 0.18 if i % 2 else 0.05
-        parts.append(f"Q{mx + dy * k:.1f} {my - dx * k:.1f} {p1[0]} {p1[1]}")
-    muzzle = " ".join(parts) + "z"
-    core = TP((4, 16), (18, 15), (30, 20), (34, 30), (28, 38), (14, 41), (5, 35), (2, 25))
-    core_d = "M" + " L".join(f"{x} {y}" for x, y in core) + "z"
-    out.append(f'<g filter="url(#gouache)"><path d="{muzzle}" fill="{CREAM_MID}"/><path d="{core_d}" fill="{CREAM}" opacity=".9"/></g>')
-    out.append(f'<path d="{core_d}" fill="{CREAM}" opacity=".5" filter="url(#softedge)"/>')
-    # cream fur running back along the near cheek, following its form
-    for a, b, c, op in [((46, 30), (60, 26), (74, 16), .7), ((44, 40), (58, 40), (72, 32), .6),
-                        ((20, 52), (34, 56), (50, 50), .5)]:
-        out.append(stroke(T(a), T(b), T(c), 2.4, CREAM, op))
-    # whisker roots, near side only
-    for dx, dy in [(16, 22), (22, 27), (17, 31), (28, 24)]:
-        p = T((dx, dy))
-        out.append(f'<circle cx="{p[0]}" cy="{p[1]}" r=".9" fill="{CREAM_SHADE}"/>')
-
-    # nose: small, warm, its top catching the light
-    n = T((0, 0))[0]
-    out.append(f'<path d="M{n - 5} 10 Q{n + 1} 7.5 {n + 7} 10 Q{n + 6} 15 {n + 1} 18 Q{n - 4} 15 {n - 5} 10z" fill="{NOSE}"/>')
-    out.append(f'<path d="M{n - 2} 9.6 Q{n + 2} 8.4 {n + 5} 9.8" stroke="#f3b19e" stroke-width="1.6" fill="none" stroke-linecap="round"/>')
-    out.append(stroke((n + 1, 18), (n + 1, 21), (n, 24.5), 1.3, INK, .8))
-
-    if mood == "hungry":
-        out.append(f'<path d="M{n - 6} 26 Q{n + 1} 24 {n + 9} 26 Q{n + 5} 35 {n + 1} 35 Q{n - 3} 35 {n - 6} 26z" fill="#5a2018"/>')
-        out.append(f'<path d="M{n - 2} 33 Q{n + 1} 30 {n + 4} 33z" fill="#c26658"/>')
-        out.append(stroke((n - 8, 26), (n + 1, 23), (n + 11, 26), 1.6, INK, .85))
-    elif mood == "happy":
-        # content: the near corner curls up, the far one barely moves
-        out.append(stroke((n - 6, 26), (n - 3, 28.5), (n, 25), 1.4, INK, .8))
-        out.append(stroke((n, 25), (n + 7, 31), (n + 14, 24), 1.6, INK, .9, taper=(0.6, 1)))
-    elif mood == "bored":
-        out.append(stroke((n - 6, 27), (n + 2, 26), (n + 11, 27.5), 1.4, INK, .8))
-    else:
-        out.append(stroke((n - 6, 26), (n - 3, 28.5), (n, 25), 1.4, INK, .8))
-        out.append(stroke((n, 25), (n + 6, 29), (n + 12, 25.5), 1.5, INK, .85))
-
-    # whiskers: a handful of curved hairs, each with its own length and
-    # angle; the far ones are short and mostly hidden by the muzzle
-    near = [((18, 22), 78, -8, 7, .8), ((20, 26), 96, 2, 12, .75), ((19, 30), 84, 10, 16, .6), ((16, 33), 60, 18, 10, .45)]
-    for (sx, sy), ln, ang, sag, op in near:
-        a = T((sx, sy))
-        r = math.radians(ang)
-        c = (a[0] + ln * math.cos(r), a[1] + ln * math.sin(r) + sag)
-        b = ((a[0] + c[0]) / 2, (a[1] + c[1]) / 2 - sag * 0.9)
-        out.append(stroke(a, b, c, 1.25, CREAM, op, taper=(0.2, 1)))
-    for (sx, sy), ln, ang, sag, op in [((-16, 23), 44, 186, 4, .5), ((-17, 28), 36, 172, 7, .4)]:
-        a = T((sx, sy))
-        r = math.radians(ang)
-        c = (a[0] + ln * math.cos(r), a[1] + ln * math.sin(r) + sag)
-        b = ((a[0] + c[0]) / 2, (a[1] + c[1]) / 2 - sag)
-        out.append(stroke(a, b, c, 1.05, CREAM, op, taper=(0.2, 1)))
-    return "".join(out)
+        kk = k[i] if isinstance(k, (list, tuple)) else k
+        d.append(f"Q{mx + dy * kk:.1f} {my - dx * kk:.1f} {p1[0]:.1f} {p1[1]:.1f}")
+    return " ".join(d) + ("z" if closed else "")
 
 
-def far_shade():
-    """The far cheek's shadow. Its edge bends round the brow, dips into
-    the eye socket beside the nose and follows the muzzle down."""
-    pts = [(-110, -70), (-36, -66), (-4, -56), (-10, -34), (-24, -22), (-10, -6), (-2, 6), (-12, 16),
-           (-26, 30), (-36, 50), (-44, 62), (-50, 70)]
-    q = TP(*pts)
-    d = f"M{q[0][0]} {q[0][1]} L{q[1][0]} {q[1][1]}"
-    for i in range(2, len(q) - 1, 2):
-        c, e = q[i], q[i + 1]
-        d += f" Q{c[0]} {c[1]} {e[0]} {e[1]}"
-    d += f" L{T((-120, 70))[0]} 70"
-    return d + f" L{q[-1][0]} {q[-1][1]}z"
+def hair(p0, p1, p2, w=1.3, color=B_LINE, opacity=0.85):
+    """A thin, grainy pencil hair line."""
+    return f'<g filter="url(#line)">{stroke(p0, p1, p2, w, color, opacity)}</g>'
 
 
-def head(mood, uid):
+# ---- head
+
+def head_shape():
+    """Wide cheeks with three soft tufts each, a flat crown, small chin."""
+    right = [(0, -62), (30, -63), (56, -54), (70, -34), (80, -10), (86, 8), (92, 18), (84, 22),
+             (88, 30), (78, 33), (78, 42), (64, 46), (46, 56), (22, 62), (0, 63)]
+    bends = [0.05, 0.08, 0.1, 0.08, 0.1, 0.06, 0.04, 0.02, 0.04, 0.02, 0.04, 0.08, 0.1, 0.06]
+    left = [(-x, y) for x, y in reversed(right[1:-1])]
+    pts = TP(*(right + left))
+    return smooth(pts, bends + [0.06] + bends[::-1][:len(left)])
+
+
+def b_ear(side, mood):
     e = EXPR[mood]
-    outline = head_outline()
-    out = [ear(-1, mood, uid), ear(1, mood, uid)]
-    out.append(f'<clipPath id="headclip{uid}"><path d="{outline}"/></clipPath>')
-    far = TP((-120, -80), (-6, -80), (-2, -40), (-6, 12), (-12, 40), (-20, 70), (-120, 70))
-    out.append(f'<clipPath id="farside{uid}"><path d="M' + " L".join(f"{x} {y}" for x, y in far) + 'z"/></clipPath>')
-    out.append(f'<g filter="url(#gouache)"><path d="{outline}" fill="{FUR}"/></g>')
-    out.append(f'<g clip-path="url(#headclip{uid})">')
-    # near side in the window light
-    out.append(f'<path d="M{T((0, -70))[0]} -70 C{T((50, -68))[0]} -66 {T((96, -30))[0]} -30 {T((92, 22))[0]} 22 '
-               f'C{T((70, 4))[0]} 2 {T((30, -20))[0]} -24 {T((6, -36))[0]} -36z" fill="{FUR_LIT}" opacity=".85" filter="url(#softedge)"/>')
-    # far cheek in red brown shade, cut along the nose bridge
-    out.append(f'<path d="{far_shade()}" fill="{SHADOW_RED}" opacity=".78" filter="url(#shade)"/>')
-    # under the jaw, where the head meets the chest
-    out.append(f'<path d="M{T((-70, 36))[0]} 36 C{T((-30, 54))[0]} 52 {T((40, 54))[0]} 52 {T((80, 34))[0]} 34 L{T((80, 70))[0]} 70 L{T((-70, 70))[0]} 70z" fill="{FUR_DEEP}" opacity=".5" filter="url(#softedge)"/>')
-    # forehead M and three crown lines: Byte's signature
-    for x0, top, ln, w in [(-9, -60, 22, 4.4), (0, -62, 28, 5), (10, -60, 22, 4.6)]:
-        a, c = T((x0, top)), T((x0 * 0.7, top + ln))
-        out.append(stroke(a, ((a[0] + c[0]) / 2 + 0.5, (top + top + ln) / 2), c, w, STRIPE, .9, taper=(0.3, 1)))
-    for side in (-1, 1):
-        col = STRIPE if side > 0 else FUR_DEEP
-        out.append(stroke(T((side * 6, -34)), T((side * 14, -26)), T((side * 22, -34)), 3.2, col, .8))
-        out.append(stroke(T((side * 22, -34)), T((side * 30, -42)), T((side * 38, -30)), 3.2, col, .8))
-    # cheek bands curving back around the near cheek; one on the far side
-    out.append(stroke(T((46, -4)), T((62, 0)), T((80, -8)), 4.4, STRIPE, .75))
-    out.append(stroke(T((50, 10)), T((66, 14)), T((84, 8)), 3.8, STRIPE, .6))
-    out.append(stroke(T((-48, -2)), T((-60, 2)), T((-74, -4)), 4, FUR_DEEP, .55))
-    # nose bridge catching the light
-    out.append(stroke(T((4, -14)), T((5, -4)), T((4, 6)), 3.4, LIGHT_EDGE, .5))
-    # loose fur at the cheeks
-    out.append(stroke(T((72, 18)), T((82, 22)), T((88, 20)), 2.6, CREAM, .6))
-    out.append(stroke(T((-70, 18)), T((-80, 22)), T((-86, 20)), 2.6, FUR_DEEP, .55))
-    out.append("</g>")
+    m = (lambda p: (side * p[0], p[1]))
+    shape = TP(m((14, -58)), m((44, -96)), m((60, -114)), m((66, -88)), m((68, -40)))
+    inner = TP(m((24, -58)), m((48, -92)), m((58, -104)), m((60, -82)), m((60, -46)))
+    near = side > 0
+    turned = e["turned_ear"] == side
+    pivot = T(m((42, -48)))
+    if turned:
+        xf = f"rotate({-24 * side} {pivot[0]} {pivot[1]}) translate({pivot[0]} 0) scale(.7 1) translate({-pivot[0]} 0)"
+    else:
+        xf = f"rotate({3 * side} {pivot[0]} {pivot[1]})"
+    hairs = "".join(
+        hair(T(m((40 + k, -54))), T(m((44 + k, -70))), T(m((48 + k * 0.6, -88))), 1.1, B_DEEP, .55)
+        for k in (0, 6, 12)
+    )
+    fur = "url(#b-head)" if near else B_FUR_DARK
+    rim = (stroke(T(m((58, -110))), T(m((66, -80))), T(m((68, -42))), 3, LIGHT_EDGE, .75, taper=(0.5, 1))
+           if near else hair(T(m((60, -112))), T(m((66, -80))), T(m((68, -42))), 1.4, B_LINE, .7))
+    listen = ' class="ear-listen"' if turned else ""
+    return f"""
+      <g transform="{xf}"><g{listen}>
+        <g filter="url(#crayon)">
+          <path d="{smooth(shape, [0.02, 0.08, 0.1, 0.04, 0])}" fill="{fur}"/>
+          <path d="{smooth(inner, [0.02, 0.08, 0.1, 0.04, 0])}" fill="{B_PINK}" opacity="{.45 if turned else .95}"/>
+        </g>
+        {hairs if not turned else ""}
+        {rim}
+      </g></g>"""
 
-    # line weight follows the light: thin on the lit cheek, heavier on
-    # the shaded side and where the chin sits in front of the chest
-    out.append(f'<path d="{outline}" stroke="{INK}" stroke-width="1.1" fill="none" opacity=".8"/>')
-    out.append(stroke(T((-62, -36)), T((-84, -6)), T((-86, 22)), 3, INK, .75))
-    out.append(stroke(T((-86, 24)), T((-78, 44)), T((-44, 54)), 3.4, INK, .8))
-    out.append(stroke(T((-50, 52)), T((-4, 64)), T((50, 50)), 4.6, INK, .85, taper=(0.7, 0.9)))
-    out.append(eye(-1, mood, uid))
-    out.append(eye(1, mood, uid))
-    if e["brow"]:
-        # one eyebrow whisker raised over the near eye
-        a = T((36, -26))
-        out.append(stroke(a, (a[0] + 30, a[1] - 22), (a[0] + 70, a[1] - 24), 1.2, CREAM, .8, taper=(0.2, 1)))
-        out.append(stroke((a[0] + 6, a[1] + 3), (a[0] + 34, a[1] - 12), (a[0] + 64, a[1] - 6), 1, CREAM, .55, taper=(0.2, 1)))
-    out.append(face(mood, uid))
-    out.append(f'<g clip-path="url(#headclip{uid})"><path d="{far_shade()}" fill="{SHADOW_RED}" opacity=".3" filter="url(#shade)"/></g>')
+
+def b_eye(side, mood, uid):
+    """A big round eye. The upper lid is a curved line across it; only
+    the part below the lid is painted, so the lid is the face's fur."""
+    e = EXPR[mood]
+    kind, lid = e["eyes"][side]
+    r = 18
+    cx, cy = T((side * 34, -12))
+    sx = SCALE_L if side < 0 else SCALE_R
+    near = side > 0
+    g = f'transform="translate({cx} {cy}) scale({sx} 1)"'
+    if kind == "content":
+        return f"""<g {g}>{hair((-r * 0.9, 3), (0, -9), (r * 0.9, 2), 3, B_LINE, .95)}
+          {hair((-r * 0.5, 7), (0, 6), (r * 0.5, 6.5), 1, B_LINE, .35)}</g>"""
+    if kind == "shut":
+        return f"""<g {g}>{hair((-r, -1), (0, 7), (r, -2), 2.8, B_LINE, .95)}
+          {hair((-r * 0.5, 8), (0, 10), (r * 0.6, 7), 1, B_LINE, .3)}</g>"""
+    lid_y = -r + 2 * r * lid               # height of the lid line at the centre
+    tilt = 3                               # the lid sinks a touch towards the outer corner
+    name = f"bey{'N' if near else 'F'}{uid}"
+    look = e["look"]
+    below = f"M{-r - 6} {lid_y - tilt} Q0 {lid_y - 2.5} {r + 6} {lid_y + tilt} L{r + 6} {r + 6} L{-r - 6} {r + 6}z"
+    pupil = r * (0.58 if mood != "hungry" else 0.66)
+    lid_light = (stroke((-r * 0.6, lid_y - 7), (0, lid_y - 9.5), (r * 0.7, lid_y - 5), 3, LIGHT_EDGE, .65)
+                 if near and lid > 0.2 else "")
+    return f"""
+      <g {g}>
+        {lid_light}
+        <clipPath id="{name}c"><circle r="{r}"/></clipPath>
+        <clipPath id="{name}l"><path d="{below}"/></clipPath>
+        <g class="blink">
+          <g clip-path="url(#{name}c)"><g clip-path="url(#{name}l)">
+            <circle r="{r}" fill="url(#b-iris)"/>
+            <circle cx="{look}" cy="1.5" r="{pupil}" fill="#2a130c"/>
+            <circle cx="{look + 4.5}" cy="{max(lid_y + 4.5, -4)}" r="2.6" fill="#fffaf0"/>
+            <circle cx="{look - 4}" cy="7" r="1.2" fill="#fffaf0" opacity=".7"/>
+            <path d="M{-r} {lid_y + 1} Q0 {lid_y + 4} {r} {lid_y + 3}" stroke="#000" stroke-opacity=".25" stroke-width="5" fill="none"/>
+            <circle r="{r}" fill="none" stroke="{B_LINE}" stroke-width="1.6" opacity=".8"/>
+          </g></g>
+          {hair((-r - 1.5, lid_y - tilt + 1), (0, lid_y - 3), (r + 2, lid_y + tilt), 2.8, B_LINE, .95)}
+        </g>
+      </g>"""
+
+
+def b_face(mood):
+    out = []
+    n = T((0, 0))[0]
+    # tiny pink nose with a darker underside
+    out.append(f'<path d="M{n - 6} 12 Q{n + 1} 8.5 {n + 8} 12 Q{n + 6} 17 {n + 1} 20 Q{n - 4} 17 {n - 6} 12z" fill="{B_NOSE}"/>')
+    out.append(f'<path d="M{n - 1} 18 Q{n + 1} 20 {n + 3} 18" stroke="#9a4a4c" stroke-width="1.6" fill="none"/>')
+    out.append(f'<ellipse cx="{n + 2}" cy="11.8" rx="2.2" ry="1" fill="#f6c0b0"/>')
+    mouth = {
+        "hungry": f'<path d="M{n - 7} 27 Q{n + 1} 24 {n + 9} 27 Q{n + 5} 37 {n + 1} 37 Q{n - 3} 37 {n - 7} 27z" fill="#6a2422"/>'
+                  f'<path d="M{n - 2} 35 Q{n + 1} 32 {n + 4} 35z" fill="#d07070"/>',
+        "happy": "",
+        "bored": "",
+    }.get(mood, "")
+    out.append(mouth)
+    out.append(hair((n + 1, 20), (n + 1, 23), (n + 1, 25.5), 1.2, "#6a2c2a", .9))
+    if mood == "bored":
+        out.append(hair((n - 7, 28), (n + 1, 27), (n + 10, 28.5), 1.3, "#6a2c2a", .85))
+    elif mood == "hungry":
+        out.append(hair((n - 9, 27), (n + 1, 23), (n + 11, 27), 1.4, "#6a2c2a", .9))
+    else:
+        lift = 3 if mood == "happy" else 1
+        out.append(hair((n - 8, 27), (n - 3.5, 30.5), (n + 1, 25.5), 1.3, "#6a2c2a", .9))
+        out.append(hair((n + 1, 25.5), (n + 6, 31), (n + 12, 26 - lift), 1.4, "#6a2c2a", .9))
+    # freckle dots on the muzzle, as in the references
+    for dx, dy in [(14, 27), (20, 31), (14, 34), (-12, 28), (-17, 32)]:
+        p = T((dx, dy))
+        out.append(f'<circle cx="{p[0]}" cy="{p[1]}" r="1.4" fill="{B_FUR_DARK}" opacity=".75"/>')
+    # whiskers: long, thin, slightly curved; each one different
+    for (sx_, sy), ln, ang, sag, op in [((22, 26), 88, -6, 6, .85), ((24, 30), 104, 4, 12, .8),
+                                        ((22, 34), 86, 13, 14, .65), ((18, 37), 62, 24, 8, .5)]:
+        a = T((sx_, sy))
+        rr = math.radians(ang)
+        c = (a[0] + ln * math.cos(rr), a[1] + ln * math.sin(rr) + sag)
+        b = ((a[0] + c[0]) / 2, (a[1] + c[1]) / 2 - sag * 0.9)
+        out.append(stroke(a, b, c, 1.15, B_WHISKER, op, taper=(0.15, 1)))
+    for (sx_, sy), ln, ang, sag, op in [((-18, 27), 56, 188, 6, .55), ((-19, 32), 48, 174, 9, .45)]:
+        a = T((sx_, sy))
+        rr = math.radians(ang)
+        c = (a[0] + ln * math.cos(rr), a[1] + ln * math.sin(rr) + sag)
+        b = ((a[0] + c[0]) / 2, (a[1] + c[1]) / 2 - sag)
+        out.append(stroke(a, b, c, 1, B_WHISKER, op, taper=(0.15, 1)))
     return "".join(out)
+
+
+def b_head(mood, uid):
+    e = EXPR[mood]
+    hd = head_shape()
+    out = [b_ear(-1, mood), b_ear(1, mood)]
+    out.append(f'<clipPath id="bhc{uid}"><path d="{hd}"/></clipPath>')
+    lower = smooth(TP((-40, 22), (-22, 14), (-6, 14), (8, 13), (26, 14), (46, 18), (60, 30),
+                      (54, 46), (30, 58), (0, 64), (-30, 58), (-46, 42)), 0.12)
+    body = f"""
+        <path d="{hd}" fill="url(#b-head)"/>
+        <g clip-path="url(#bhc{uid})">
+          <path d="{smooth(TP((-120, -80), (-30, -70), (-22, -20), (-30, 30), (-60, 80), (-130, 80)), 0.12)}" fill="{B_FUR_DARK}" opacity=".45" filter="url(#haze)"/>
+          <path d="{lower}" fill="{B_CREAM}" opacity=".95" filter="url(#crayon-soft)"/>
+          <path d="{smooth(TP((6, 16), (24, 16), (38, 24), (34, 36), (16, 40), (4, 32)), 0.15)}" fill="{B_CREAM_LIT}" opacity=".7" filter="url(#crayon-soft)"/>
+          <g filter="url(#blurband)" opacity=".9">
+            {stroke(T((-12, -63)), T((-11, -54)), T((-9, -42)), 7, B_STRIPE, 1, taper=(0.1, 1))}
+            {stroke(T((2, -64)), T((3, -52)), T((3, -38)), 8, B_STRIPE, 1, taper=(0.1, 1))}
+            {stroke(T((16, -63)), T((15, -54)), T((13, -42)), 7, B_STRIPE, 1, taper=(0.1, 1))}
+            {stroke(T((48, -10)), T((66, -6)), T((86, -14)), 7, B_STRIPE, .8)}
+            {stroke(T((-50, -8)), T((-64, -4)), T((-80, -10)), 6, B_STRIPE, .7)}
+          </g>
+        </g>"""
+    out.append(f'<g filter="url(#crayon)">{body}</g>')
+    out.append(f'<rect x="-140" y="-80" width="280" height="160" filter="url(#speckle)" opacity=".22" clip-path="url(#bhc{uid})"/>')
+    # lines only where the head overlaps something: the chin over the
+    # chest, the far cheek over the back
+    out.append(hair(T((-46, 56)), T((-4, 70)), T((48, 56)), 2.2, B_LINE, .75))
+    out.append(hair(T((-88, 34)), T((-76, 48)), T((-56, 54)), 1.6, B_LINE, .6))
+    out.append(hair(T((-70, -30)), T((-84, -4)), T((-92, 14)), 1.3, B_LINE, .45))
+    out.append(b_eye(-1, mood, uid))
+    out.append(b_eye(1, mood, uid))
+    if e["brow"]:
+        a = T((38, -32))
+        out.append(stroke(a, (a[0] + 26, a[1] - 22), (a[0] + 64, a[1] - 26), 1.1, B_WHISKER, .85, taper=(0.15, 1)))
+        out.append(stroke((a[0] + 6, a[1] + 3), (a[0] + 32, a[1] - 12), (a[0] + 62, a[1] - 8), 1, B_WHISKER, .6, taper=(0.15, 1)))
+    out.append(b_face(mood))
+    return "".join(out)
+
+
+# ---- body
+
+def b_tail():
+    pts, ws = [], []
+    for seg, w0, w1, n in [(TAIL_A, 28, 25, 12), (TAIL_B, 25, 16, 18)]:
+        for i in range(n + (seg is TAIL_B)):
+            t = i / n
+            pts.append(_cubic(*seg, t))
+            ws.append(w0 * (1 - t) + w1 * t)
+    for k, f in zip(range(1, 6), (0.3, 0.55, 0.72, 0.85, 0.94)):
+        ws[-k] *= f
+    d = _ribbon(pts, ws)
+    rings = []
+    for idx in (8, 15, 21, 26):
+        (x, y), (x2, y2) = pts[idx], pts[idx + 1]
+        ang = math.atan2(y2 - y, x2 - x) + math.pi / 2
+        hw = ws[idx] / 2
+        c, s_ = math.cos(ang) * hw, math.sin(ang) * hw
+        rings.append(stroke((x - c, y - s_), (x + 4, y), (x + c, y + s_), 9, B_STRIPE, .8, taper=(0.3, 0.3)))
+    return f"""
+    <mask id="tailmask" maskUnits="userSpaceOnUse" x="-260" y="-200" width="420" height="240">
+      <rect x="-260" y="-200" width="420" height="240" fill="#fff"/>
+      <path d="{BODY}" fill="#000"/>
+      <rect x="-150" y="-12" width="200" height="30" fill="#fff"/>
+      <path d="M-60 -12 L10 -12 L10 -30 L-60 -30z" fill="#fff"/>
+    </mask>
+    <g class="tail" mask="url(#tailmask)">
+      <g filter="url(#crayon)">
+        <path d="{d}" fill="url(#b-tail)"/>
+        <g filter="url(#blurband)">{"".join(rings)}</g>
+      </g>
+      {hair(pts[2], pts[6], pts[11], 1.4, B_LINE, .55)}
+      {stroke(pts[14], pts[20], pts[26], 3, B_FUR_LIT, .55)}
+    </g>"""
+
+
+def b_body(uid):
+    stripes = "".join(
+        stroke((x, y + 2), (x + dx * 0.4 - 6, y + ln * 0.55), (x + dx, y + ln), w, B_STRIPE, .85, taper=(0.3, 1))
+        for x, y, dx, ln, w in [(-14, -156, -4, 52, 15), (-50, -149, -9, 56, 15), (-86, -136, -13, 54, 14),
+                                (-118, -118, -14, 46, 13), (-146, -96, -12, 38, 11)]
+    ) + stroke((-150, -60), (-132, -70), (-112, -64), 10, B_STRIPE, .7) + stroke((-140, -36), (-122, -44), (-102, -38), 9, B_STRIPE, .6)
+    bib = smooth([(28, -84), (60, -100), (98, -96), (120, -66), (122, -36), (112, -14), (90, -8),
+                  (60, -8), (38, -18), (26, -44)], 0.12)
+    thigh_shade = smooth([(-172, -92), (-150, -100), (-118, -86), (-100, -50), (-104, -8), (-152, -6), (-184, -30)], 0.1)
+    return f"""
+      <clipPath id="bbody{uid}"><path d="{BODY}"/></clipPath>
+      <g class="breathe">
+        <g filter="url(#crayon)">
+          <path d="{BODY}" fill="url(#b-body)"/>
+          <g clip-path="url(#bbody{uid})">
+            <path d="{thigh_shade}" fill="{B_FUR_DARK}" opacity=".5" filter="url(#haze)"/>
+            <path d="M-170 -20 C-80 -30 40 -30 120 -20 L120 10 L-170 10z" fill="{B_DEEP}" opacity=".35" filter="url(#haze)"/>
+            <g filter="url(#blurband)">{stripes}</g>
+            <path d="{bib}" fill="url(#b-cream)" filter="url(#crayon-soft)"/>
+          </g>
+        </g>
+        <rect x="-200" y="-170" width="330" height="170" filter="url(#speckle)" opacity=".4" clip-path="url(#bbody{uid})"/>
+        {stroke((-160, -100), (-86, -164), (10, -158), 3, LIGHT_EDGE, .55, taper=(1, 0.7), n=26)}
+        {hair((-104, -10), (-104, -40), (-116, -62), 1.4, B_LINE, .45)}
+        {hair((-182, -40), (-184, -18), (-160, -7), 1.6, B_LINE, .5)}
+        <g filter="url(#crayon)">
+          <path d="{smooth([(48, -4), (52, -20), (72, -26), (96, -22), (110, -12), (108, -3)], 0.12)}" fill="url(#b-cream)"/>
+        </g>
+        {hair((48, -4), (60, -1), (108, -3), 1.8, B_LINE, .7)}
+        {hair((74, -5), (75, -11), (76, -16), 1.2, B_LINE, .65)}
+        {hair((89, -5), (90, -11), (91, -16), 1.2, B_LINE, .65)}
+      </g>
+      {b_tail()}"""
 
 
 def byte(mood, x, y, s=1.0, uid="", with_body=True):
     """Byte at (x, y), ground under the paws, scale s."""
-    tilt = EXPR[mood]["tilt"]
-    drop = EXPR[mood]["drop"]
-    parts = []
+    e = EXPR[mood]
+    parts = [b_body(uid)] if with_body else []
     if with_body:
-        parts.append(f"""
-            <clipPath id="bodyclip{uid}"><path d="{BODY}"/></clipPath>
-      <g class="breathe">
-        <g filter="url(#gouache)"><path d="{BODY}" fill="{FUR}"/></g>
-        <g clip-path="url(#bodyclip{uid})">
-          <path d="{HAUNCH_SHADE}" fill="{FUR_SHADE}" opacity=".55" filter="url(#haze)"/>
-          <path d="{BELLY_SHADE}" fill="{FUR_DEEP}" opacity=".55" filter="url(#softedge)"/>
-          <path d="M-40 -160 C30 -164 104 -122 118 -66 L140 -66 L140 -190z" fill="{FUR_LIT}" opacity=".55" filter="url(#softedge)"/>
-          {body_stripes()}
-          <g filter="url(#drybrush)">{stroke((-150, -112), (-80, -160), (6, -150), 12, FUR_LIT, .85, n=24)}</g>
-        </g>
-        {stroke((-166, -98), (-86, -166), (14, -157), 2.8, "#ffd59a", .85, taper=(1, 0.6), n=26)}
-        {stroke((-104, -12), (-104, -36), (-114, -56), 3, FUR_DEEP, .45)}
-        {stroke((-126, -70), (-140, -80), (-158, -82), 2.6, FUR_DEEP, .35)}
-        {stroke((-112, -64), (-128, -74), (-146, -74), 2.4, FUR_LIT, .5)}
-        <path d="{BODY}" stroke="{INK}" stroke-width="1.9" fill="none" opacity=".85"/>
-        {stroke((-170, -90), (-190, -50), (-150, -6), 3.2, INK, .6)}
-        {chest()}
-        {paw()}
-      </g>
-      {tail()}""")
+        # the head sits on the body: a soft occlusion shadow where they meet
+        parts.append(f'<g clip-path="url(#bbody{uid})"><ellipse cx="{HEAD_X - 40}" cy="{HEAD_Y + e["drop"] + 10}" rx="70" ry="78" '
+                     f'fill="{B_DEEP}" opacity=".45" filter="url(#haze)"/></g>')
     parts.append(
-        f'<g transform="translate({HEAD_X} {HEAD_Y + drop}) rotate({tilt}) scale({HEAD_S})">{head(mood, uid)}</g>'
+        f'<g transform="translate({HEAD_X} {HEAD_Y + e["drop"]}) rotate({e["tilt"]}) scale({HEAD_S})">{b_head(mood, uid)}</g>'
     )
     return f'<g transform="translate({x} {y}) scale({s})">{"".join(parts)}</g>'
 
